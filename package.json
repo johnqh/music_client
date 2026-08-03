@@ -34,7 +34,7 @@
   "author": "Sudobility",
   "license": "BUSL-1.1",
   "dependencies": {
-    "@sudobility/music_types": "^0.1.0"
+    "@sudobility/music_types": "^0.4.0"
   },
   "peerDependencies": {
     "@sudobility/di": "^1.5.58",
