@@ -139,3 +139,37 @@ describe('MusicClient error mapping', () => {
     expect((err as ApiError).message).toBe('boom');
   });
 });
+
+describe('MusicClient publishing', () => {
+  const headersOf = (calls: Recorded[]): Record<string, string> =>
+    (calls[0].options?.headers as Record<string, string> | undefined) ?? {};
+
+  it('reads a published snapshot without sending a token', async () => {
+    // The whole point of the public routes: a visitor has no token to send.
+    const { client, calls } = fakeNetwork({ success: true, data: {} });
+    await new MusicClient(client, BASE).getPublishedSnapshot('pub_x');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/public/snapshots/pub_x`);
+    expect(headersOf(calls).Authorization).toBeUndefined();
+  });
+
+  it('reads the community list without a token', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: [] });
+    await new MusicClient(client, BASE).listCommunity();
+    expect(calls[0].url).toBe(`${BASE}/api/v1/public/community`);
+    expect(headersOf(calls).Authorization).toBeUndefined();
+  });
+
+  it('publishes with a token', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: {} });
+    await new MusicClient(client, BASE).publishSnapshot('s1', 'Jane', 'tok');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/snapshots/s1/publish`);
+    expect(headersOf(calls).Authorization).toBe('Bearer tok');
+  });
+
+  it('unpublishes with a token', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: {} });
+    await new MusicClient(client, BASE).unpublishSnapshot('s1', 'tok');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/snapshots/s1/unpublish`);
+    expect(headersOf(calls).Authorization).toBe('Bearer tok');
+  });
+});

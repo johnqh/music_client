@@ -14,6 +14,8 @@ import type {
   ProjectRecord,
   ProjectSummary,
   ProjectUpdateRequest,
+  CommunityItem,
+  PublishedSnapshot,
   Snapshot,
   SnapshotSummary,
   RegenerateRegionRequest,
@@ -147,6 +149,35 @@ export class MusicClient {
       method: 'POST',
       token,
     });
+  }
+
+  publishSnapshot(id: string, publisherName: string, token: string): Promise<Snapshot> {
+    return this.request<Snapshot>(`/snapshots/${encodeURIComponent(id)}/publish`, {
+      method: 'POST',
+      body: { publisherName },
+      token,
+    });
+  }
+
+  unpublishSnapshot(id: string, token: string): Promise<Snapshot> {
+    return this.request<Snapshot>(`/snapshots/${encodeURIComponent(id)}/unpublish`, {
+      method: 'POST',
+      token,
+    });
+  }
+
+  lastPublisherName(token: string): Promise<{ publisherName: string | null }> {
+    return this.request<{ publisherName: string | null }>('/snapshots/publisher-name', { token });
+  }
+
+  // -- Public (no token: a visitor has none) -----------------------------------
+
+  getPublishedSnapshot(publicId: string): Promise<PublishedSnapshot> {
+    return this.request<PublishedSnapshot>(`/public/snapshots/${encodeURIComponent(publicId)}`, {});
+  }
+
+  listCommunity(): Promise<CommunityItem[]> {
+    return this.request<CommunityItem[]>('/public/community', {});
   }
 
   async deleteProject(id: string, token: string): Promise<void> {
