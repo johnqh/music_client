@@ -11,8 +11,4 @@ export const musicQueryKeys = {
     list: (query?: ProjectListQuery) => ['music', 'projects', 'list', query ?? {}] as const,
     detail: (id: string) => ['music', 'projects', 'detail', id] as const,
   },
-  snapshots: {
-    all: ['music', 'snapshots'] as const,
-    list: (projectId: string) => ['music', 'snapshots', 'list', projectId] as const,
-  },
 } as const;

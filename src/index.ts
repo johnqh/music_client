@@ -18,9 +18,4 @@ export {
   useProjects,
   type MusicHookContext,
 } from './hooks/use-projects.js';
-export {
-  useCreateSnapshot,
-  useOpenSnapshot,
-  useSnapshots,
-} from './hooks/use-snapshots.js';
 export { useGenerateScore, useRegenerateRegion } from './hooks/use-generation.js';
