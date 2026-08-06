@@ -14,6 +14,8 @@ import type {
   ProjectRecord,
   ProjectSummary,
   ProjectUpdateRequest,
+  Snapshot,
+  SnapshotSummary,
   RegenerateRegionRequest,
   RegenerateRegionResult,
 } from '@sudobility/music_types';
@@ -114,6 +116,35 @@ export class MusicClient {
     return this.request<ProjectRecord>(`/projects/${encodeURIComponent(id)}`, {
       method: 'PUT',
       body: req,
+      token,
+    });
+  }
+
+  // -- Snapshots -------------------------------------------------------------
+
+  listSnapshots(projectId: string, token: string): Promise<SnapshotSummary[]> {
+    return this.request<SnapshotSummary[]>(
+      `/projects/${encodeURIComponent(projectId)}/snapshots`,
+      { token }
+    );
+  }
+
+  createSnapshot(projectId: string, name: string, token: string): Promise<Snapshot> {
+    return this.request<Snapshot>(`/projects/${encodeURIComponent(projectId)}/snapshots`, {
+      method: 'POST',
+      body: { name },
+      token,
+    });
+  }
+
+  getSnapshot(id: string, token: string): Promise<Snapshot> {
+    return this.request<Snapshot>(`/snapshots/${encodeURIComponent(id)}`, { token });
+  }
+
+  /** Replaces the live project with this snapshot; returns the updated project. */
+  openSnapshot(id: string, token: string): Promise<ProjectRecord> {
+    return this.request<ProjectRecord>(`/snapshots/${encodeURIComponent(id)}/open`, {
+      method: 'POST',
       token,
     });
   }
