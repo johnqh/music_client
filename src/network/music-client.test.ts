@@ -226,3 +226,16 @@ describe('MusicClient generation jobs', () => {
     expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
   });
 });
+
+describe('MusicClient project-scoped generation cancel', () => {
+  it('POSTs to the project generation cancel route', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { ok: true } });
+    const music = new MusicClient(client, BASE);
+
+    await music.cancelProjectGeneration('p1', 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/projects/p1/generation/cancel`);
+    expect(calls[0].options?.method).toBe('POST');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+  });
+});

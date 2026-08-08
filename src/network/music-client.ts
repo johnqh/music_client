@@ -121,6 +121,17 @@ export class MusicClient {
     });
   }
 
+  /**
+   * Cancels by project rather than job — for the projects list, which has no
+   * job id. A project can only have one running job, so this is unambiguous.
+   */
+  async cancelProjectGeneration(projectId: string, token: string): Promise<void> {
+    await this.request<{ ok: boolean }>(
+      `/projects/${encodeURIComponent(projectId)}/generation/cancel`,
+      { method: 'POST', token }
+    );
+  }
+
   // -- Projects --------------------------------------------------------------
 
   listProjects(token: string, query?: ProjectListQuery): Promise<ProjectSummary[]> {
