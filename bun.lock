@@ -5,7 +5,7 @@
     "": {
       "name": "@sudobility/music_client",
       "dependencies": {
-        "@sudobility/music_types": "^0.11.1",
+        "@sudobility/music_types": "^0.11.2",
       },
       "devDependencies": {
         "@eslint/js": "^9.38.0",
@@ -139,7 +139,7 @@
 
     "@sudobility/di": ["@sudobility/di@1.5.58", "", { "peerDependencies": { "@notifee/react-native": ">=7.0.0", "@react-native-async-storage/async-storage": ">=1.19.0", "@react-native-community/netinfo": ">=9.0.0", "@react-native-firebase/analytics": ">=18.0.0", "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/messaging": ">=18.0.0", "@react-native-firebase/remote-config": ">=18.0.0", "@sudobility/types": "^1.9.62", "firebase": ">=11.0.0", "react": ">=18.0.0", "react-native": ">=0.70.0" }, "optionalPeers": ["@notifee/react-native", "@react-native-async-storage/async-storage", "@react-native-community/netinfo", "@react-native-firebase/analytics", "@react-native-firebase/app", "@react-native-firebase/messaging", "@react-native-firebase/remote-config", "firebase", "react-native"] }, "sha512-0dheHIza5B+DrEZzj3eZUlE1gI3Rst0XFhboC8CDskEhXNhVd6THxlMhbj20hXC4zxB9Ore6n8YxFDOZbT1qaA=="],
 
-    "@sudobility/music_types": ["@sudobility/music_types@0.11.1", "", { "dependencies": { "zod": "^4.0.0" }, "peerDependencies": { "@sudobility/types": "^1.9.64" } }, "sha512-AMPi6Kcsmba7kiEhTyoTEtLZvbed5chtBv40DaWKt4nLx5iySg9TfhCi3G3AkiyPljYJnsg+crgGmJsfnU809A=="],
+    "@sudobility/music_types": ["@sudobility/music_types@0.11.2", "", { "dependencies": { "zod": "^4.0.0" }, "peerDependencies": { "@sudobility/types": "^1.9.64" } }, "sha512-SfGiqqAWvzBgUipbMsic6Owu0kMW6ugnrTZ5rgUnvFoQZRUTgskDOJRVDCtog0ReZ/W3rUG5I0P+eMZeJfGAOA=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.64", "", {}, "sha512-fiOxOM1vNK2Vp5B324POcRhq6XOoeoHInP3GbvGPmn8MvsoAl0hgO2X4gJh2VZIybFZwIdE4SD0dO1vu/JgFSA=="],
 
