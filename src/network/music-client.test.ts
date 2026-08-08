@@ -239,3 +239,21 @@ describe('MusicClient project-scoped generation cancel', () => {
     expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
   });
 });
+
+describe('MusicClient project status polling', () => {
+  it('reads just the status, not the whole project', async () => {
+    const { client, calls } = fakeNetwork({
+      success: true,
+      data: { status: 'generating', updatedAt: '2026-08-08T00:00:00.000Z' },
+    });
+    const music = new MusicClient(client, BASE);
+
+    const result = await music.getProjectStatus('p1', 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/projects/p1/status`);
+    expect(calls[0].options?.method).toBe('GET');
+    expect(result.status).toBe('generating');
+    // updatedAt rides along so a client can tell the score changed under it.
+    expect(result.updatedAt).toBe('2026-08-08T00:00:00.000Z');
+  });
+});

@@ -14,6 +14,7 @@ import type {
   ProjectCreateRequest,
   ProjectListQuery,
   ProjectRecord,
+  ProjectStatus,
   ProjectSummary,
   ProjectUpdateRequest,
   CommunityItem,
@@ -144,6 +145,23 @@ export class MusicClient {
 
   getProject(id: string, token: string): Promise<ProjectRecord> {
     return this.request<ProjectRecord>(`/projects/${encodeURIComponent(id)}`, { token });
+  }
+
+  /**
+   * Just the status, for polling while a generation job runs.
+   *
+   * `getProject` would ship the whole score every few seconds, and the score
+   * cannot change while generating — writes are rejected — so that payload is
+   * pure waste.
+   */
+  async getProjectStatus(
+    id: string,
+    token: string
+  ): Promise<{ status: ProjectStatus; updatedAt: string }> {
+    return this.request<{ status: ProjectStatus; updatedAt: string }>(
+      `/projects/${encodeURIComponent(id)}/status`,
+      { token }
+    );
   }
 
   createProject(req: ProjectCreateRequest, token: string): Promise<ProjectRecord> {
