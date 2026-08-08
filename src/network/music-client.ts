@@ -7,8 +7,10 @@
 import type { NetworkClient } from '@sudobility/types';
 import type {
   ApiResponse,
+  CreateGenerationJobRequest,
   GenerateScoreRequest,
   GenerateScoreResult,
+  GenerationJob,
   ProjectCreateRequest,
   ProjectListQuery,
   ProjectRecord,
@@ -93,6 +95,29 @@ export class MusicClient {
       body: req,
       token,
       ...(signal ? { signal } : {}),
+    });
+  }
+
+  // -- Generation jobs -------------------------------------------------------
+
+  /**
+   * Starts a generation and returns as soon as the row exists — the work runs
+   * on the server. Nothing here holds a connection open for the minutes a
+   * generation takes, which is the entire point of the job model.
+   */
+  createJob(req: CreateGenerationJobRequest, token: string): Promise<GenerationJob> {
+    return this.request<GenerationJob>('/jobs', { method: 'POST', body: req, token });
+  }
+
+  getJob(id: string, token: string): Promise<GenerationJob> {
+    return this.request<GenerationJob>(`/jobs/${encodeURIComponent(id)}`, { token });
+  }
+
+  /** Releases the project. A job already in flight discards its result when it notices. */
+  async cancelJob(id: string, token: string): Promise<void> {
+    await this.request<{ ok: boolean }>(`/jobs/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      token,
     });
   }
 

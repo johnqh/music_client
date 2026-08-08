@@ -173,3 +173,56 @@ describe('MusicClient publishing', () => {
     expect(headersOf(calls).Authorization).toBe('Bearer tok');
   });
 });
+
+describe('MusicClient generation jobs', () => {
+  const runningJob = () => ({
+    id: 'j1',
+    projectId: 'p1',
+    kind: 'replace-notes',
+    status: 'running',
+    createdAt: '2026-08-07T00:00:00.000Z',
+    finishedAt: null,
+    error: null,
+  });
+
+  it('creates a job via POST with the whole request payload', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: runningJob() });
+    const music = new MusicClient(client, BASE);
+
+    const job = await music.createJob(
+      { projectId: 'p1', kind: 'replace-notes', request: { instruction: 'brighter' } },
+      'tok'
+    );
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/jobs`);
+    expect(calls[0].options?.method).toBe('POST');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+    expect(JSON.parse(calls[0].options?.body as string)).toEqual({
+      projectId: 'p1',
+      kind: 'replace-notes',
+      request: { instruction: 'brighter' },
+    });
+    expect(job.status).toBe('running');
+  });
+
+  it('fetches a job by encoded id', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: runningJob() });
+    const music = new MusicClient(client, BASE);
+
+    await music.getJob('a/b', 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/jobs/a%2Fb`);
+    expect(calls[0].options?.method).toBe('GET');
+  });
+
+  it('cancels via POST to the cancel sub-route', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { ok: true } });
+    const music = new MusicClient(client, BASE);
+
+    await music.cancelJob('j1', 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/jobs/j1/cancel`);
+    expect(calls[0].options?.method).toBe('POST');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+  });
+});

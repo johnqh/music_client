@@ -18,4 +18,10 @@ export {
   useProjects,
   type MusicHookContext,
 } from './hooks/use-projects.js';
-export { useGenerateScore, useRegenerateRegion } from './hooks/use-generation.js';
+export {
+  useCancelGenerationJob,
+  useCreateGenerationJob,
+  useGenerateScore,
+  useGenerationJob,
+  useRegenerateRegion,
+} from './hooks/use-generation.js';
