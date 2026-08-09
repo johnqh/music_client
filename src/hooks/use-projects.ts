@@ -10,6 +10,7 @@ import type { NetworkClient } from '@sudobility/types';
 import type {
   ProjectCreateRequest,
   ProjectListQuery,
+  ProjectRecord,
   ProjectUpdateRequest,
 } from '@sudobility/music_types';
 import { MusicClient } from '../network/music-client.js';
@@ -64,8 +65,18 @@ export function useUpdateProject(ctx: MusicHookContext) {
   return useMutation({
     mutationFn: ({ id, req }: { id: string; req: ProjectUpdateRequest }) =>
       client.updateProject(id, req, ctx.token as string),
-    onSuccess: (record) => {
-      queryClient.setQueryData(musicQueryKeys.projects.detail(record.id), record);
+    onSuccess: (saved, { req }) => {
+      // A save returns metadata, not a record — writing it into the detail
+      // cache verbatim would replace a cached project with a score-less one.
+      // Patch the cached entry instead, keeping the score this very request
+      // just sent (or the cached one, for a prefs-only save).
+      queryClient.setQueryData(
+        musicQueryKeys.projects.detail(saved.id),
+        (previous: ProjectRecord | undefined) => {
+          const score = req.score ?? previous?.score;
+          return score ? { ...saved, score } : previous;
+        }
+      );
       void queryClient.invalidateQueries({ queryKey: musicQueryKeys.projects.list() });
     },
   });

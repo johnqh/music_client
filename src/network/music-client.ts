@@ -12,9 +12,11 @@ import type {
   GenerateScoreResult,
   GenerationJob,
   ProjectCreateRequest,
+  ProjectDuplicateRequest,
   ProjectListQuery,
   ProjectRecord,
-  ProjectStatus,
+  ProjectSaveResult,
+  ProjectStatusResult,
   ProjectSummary,
   ProjectUpdateRequest,
   CommunityItem,
@@ -33,6 +35,43 @@ import {
 } from '../errors.js';
 
 const BASE_PATH = '/api/v1';
+
+/**
+ * Bodies below this go up as-is.
+ *
+ * gzip costs a header and a CPU pass; below a kilobyte it can make the payload
+ * *larger*, and a request that small was never the problem. Matches the floor
+ * the server's response compression uses, so both directions turn on together.
+ */
+const COMPRESS_MIN_BYTES = 1024;
+
+/**
+ * Gzips a request body when it is worth it and the platform can.
+ *
+ * A browser gzips responses it *receives* automatically and bodies it *sends*
+ * never — so uploading a score, the largest thing this client does and the
+ * thing an autosave does on every debounce window, was the one leg still
+ * paying full price. `CompressionStream` is missing on React Native's engine,
+ * which is why this degrades to the plain string rather than assuming it.
+ */
+async function encodeBody(json: string): Promise<{ body: string | Blob; encoding?: string }> {
+  if (json.length < COMPRESS_MIN_BYTES || typeof CompressionStream === 'undefined') {
+    return { body: json };
+  }
+  try {
+    // Through `Response`, not `Blob.stream()`: jsdom's Blob has no `stream`,
+    // so the Blob route silently degrades in exactly the environment the tests
+    // run in — the feature would never have been exercised.
+    const source = new Response(json).body;
+    if (!source) return { body: json };
+    const gzipped = await new Response(source.pipeThrough(new CompressionStream('gzip')))
+      .arrayBuffer();
+    return { body: new Blob([gzipped]), encoding: 'gzip' };
+  } catch {
+    // Never fail a save over an optimisation.
+    return { body: json };
+  }
+}
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -57,10 +96,17 @@ export class MusicClient {
       headers['Authorization'] = `Bearer ${options.token}`;
     }
 
+    let body: string | Blob | undefined;
+    if (options.body !== undefined) {
+      const encoded = await encodeBody(JSON.stringify(options.body));
+      body = encoded.body;
+      if (encoded.encoding) headers['Content-Encoding'] = encoded.encoding;
+    }
+
     const response = await this.networkClient.request<ApiResponse<T>>(url, {
       method: options.method ?? 'GET',
       headers,
-      ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(body !== undefined ? { body } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
 
@@ -148,29 +194,49 @@ export class MusicClient {
   }
 
   /**
-   * Just the status, for polling while a generation job runs.
+   * Just the status, for polling while a generation job runs — and for
+   * `parentSnapshotId`, the one other field an open editor needs.
    *
    * `getProject` would ship the whole score every few seconds, and the score
    * cannot change while generating — writes are rejected — so that payload is
    * pure waste.
    */
-  async getProjectStatus(
-    id: string,
-    token: string
-  ): Promise<{ status: ProjectStatus; updatedAt: string }> {
-    return this.request<{ status: ProjectStatus; updatedAt: string }>(
-      `/projects/${encodeURIComponent(id)}/status`,
-      { token }
-    );
+  async getProjectStatus(id: string, token: string): Promise<ProjectStatusResult> {
+    return this.request<ProjectStatusResult>(`/projects/${encodeURIComponent(id)}/status`, {
+      token,
+    });
   }
 
-  createProject(req: ProjectCreateRequest, token: string): Promise<ProjectRecord> {
-    return this.request<ProjectRecord>('/projects', { method: 'POST', body: req, token });
+  /**
+   * Creates a project. Returns metadata, not the score: the caller sent that
+   * score a moment ago and still holds it, so echoing it back doubles the cost
+   * of every create — and of every autosave, on `updateProject` below.
+   */
+  createProject(req: ProjectCreateRequest, token: string): Promise<ProjectSaveResult> {
+    return this.request<ProjectSaveResult>('/projects', { method: 'POST', body: req, token });
   }
 
-  updateProject(id: string, req: ProjectUpdateRequest, token: string): Promise<ProjectRecord> {
-    return this.request<ProjectRecord>(`/projects/${encodeURIComponent(id)}`, {
+  updateProject(id: string, req: ProjectUpdateRequest, token: string): Promise<ProjectSaveResult> {
+    return this.request<ProjectSaveResult>(`/projects/${encodeURIComponent(id)}`, {
       method: 'PUT',
+      body: req,
+      token,
+    });
+  }
+
+  /**
+   * Copies a project without its score crossing the wire in either direction.
+   *
+   * The client-side alternative — GET then POST — moved the whole score twice
+   * for a copy nobody was going to look at.
+   */
+  duplicateProject(
+    id: string,
+    req: ProjectDuplicateRequest,
+    token: string
+  ): Promise<ProjectSaveResult> {
+    return this.request<ProjectSaveResult>(`/projects/${encodeURIComponent(id)}/duplicate`, {
+      method: 'POST',
       body: req,
       token,
     });
@@ -185,8 +251,14 @@ export class MusicClient {
     );
   }
 
-  createSnapshot(projectId: string, name: string, token: string): Promise<Snapshot> {
-    return this.request<Snapshot>(`/projects/${encodeURIComponent(projectId)}/snapshots`, {
+  /**
+   * Pins the project's stored score as a new version.
+   *
+   * Returns a summary: the caller is looking at the very score it asked to
+   * pin, so sending a second copy of it back is freight nobody unpacks.
+   */
+  createSnapshot(projectId: string, name: string, token: string): Promise<SnapshotSummary> {
+    return this.request<SnapshotSummary>(`/projects/${encodeURIComponent(projectId)}/snapshots`, {
       method: 'POST',
       body: { name },
       token,
@@ -205,16 +277,17 @@ export class MusicClient {
     });
   }
 
-  publishSnapshot(id: string, publisherName: string, token: string): Promise<Snapshot> {
-    return this.request<Snapshot>(`/snapshots/${encodeURIComponent(id)}/publish`, {
+  /** Publishing changes who may read the score, never the score — so neither response carries one. */
+  publishSnapshot(id: string, publisherName: string, token: string): Promise<SnapshotSummary> {
+    return this.request<SnapshotSummary>(`/snapshots/${encodeURIComponent(id)}/publish`, {
       method: 'POST',
       body: { publisherName },
       token,
     });
   }
 
-  unpublishSnapshot(id: string, token: string): Promise<Snapshot> {
-    return this.request<Snapshot>(`/snapshots/${encodeURIComponent(id)}/unpublish`, {
+  unpublishSnapshot(id: string, token: string): Promise<SnapshotSummary> {
+    return this.request<SnapshotSummary>(`/snapshots/${encodeURIComponent(id)}/unpublish`, {
       method: 'POST',
       token,
     });

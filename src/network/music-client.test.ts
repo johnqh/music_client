@@ -72,6 +72,58 @@ describe('MusicClient request shapes', () => {
     expect(calls[1].options?.method).toBe('DELETE');
   });
 
+  it('duplicates by POST, sending no score in either direction', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { id: 'p2', name: 'X (copy)' } });
+    const music = new MusicClient(client, BASE);
+
+    const copy = await music.duplicateProject('p1', {}, 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/projects/p1/duplicate`);
+    expect(calls[0].options?.method).toBe('POST');
+    // The whole point: the score is copied inside the database. A request that
+    // carried one would mean the client had downloaded it to send it back.
+    expect(JSON.parse(calls[0].options?.body as string)).toEqual({});
+    expect(copy.id).toBe('p2');
+  });
+
+  it('duplicates under a chosen name', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { id: 'p2' } });
+    const music = new MusicClient(client, BASE);
+    await music.duplicateProject('p1', { name: 'Take 2' }, 'tok');
+    expect(JSON.parse(calls[0].options?.body as string)).toEqual({ name: 'Take 2' });
+  });
+
+  it('gzips a large request body and says so', async () => {
+    // Uploading a score is the one leg still paying full price: a browser
+    // gzips responses it receives automatically and bodies it sends never.
+    const { client, calls } = fakeNetwork({ success: true, data: { id: 'p1' } });
+    const music = new MusicClient(client, BASE);
+    const score = { padding: 'x'.repeat(5000) } as never;
+
+    await music.createProject({ name: 'Big', score }, 'tok');
+
+    expect(calls[0].options?.headers?.['Content-Encoding']).toBe('gzip');
+    const body = calls[0].options?.body as Blob;
+    expect(body).toBeInstanceOf(Blob);
+    expect(body.size).toBeLessThan(5000); // the whole point
+
+    // Round-trips: the server gets exactly the JSON that was meant. Decoded
+    // via `Response` rather than `Blob.stream()`, which jsdom does not have.
+    const raw = new Response(await body.arrayBuffer()).body as ReadableStream;
+    const plain = await new Response(raw.pipeThrough(new DecompressionStream('gzip'))).text();
+    expect(JSON.parse(plain)).toEqual({ name: 'Big', score });
+  });
+
+  it('leaves a small body alone, where gzip would only add a header', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { id: 'p1' } });
+    const music = new MusicClient(client, BASE);
+
+    await music.updateProject('p1', { name: 'Y' }, 'tok');
+
+    expect(calls[0].options?.headers?.['Content-Encoding']).toBeUndefined();
+    expect(typeof calls[0].options?.body).toBe('string');
+  });
+
   it('unwraps the envelope and returns data', async () => {
     const { client } = fakeNetwork({ success: true, data: { status: 'ok' } });
     const music = new MusicClient(client, BASE);
@@ -244,7 +296,11 @@ describe('MusicClient project status polling', () => {
   it('reads just the status, not the whole project', async () => {
     const { client, calls } = fakeNetwork({
       success: true,
-      data: { status: 'generating', updatedAt: '2026-08-08T00:00:00.000Z' },
+      data: {
+        status: 'generating',
+        updatedAt: '2026-08-08T00:00:00.000Z',
+        parentSnapshotId: 's1',
+      },
     });
     const music = new MusicClient(client, BASE);
 
@@ -255,5 +311,8 @@ describe('MusicClient project status polling', () => {
     expect(result.status).toBe('generating');
     // updatedAt rides along so a client can tell the score changed under it.
     expect(result.updatedAt).toBe('2026-08-08T00:00:00.000Z');
+    // ...and so does the parent snapshot, which the editor otherwise had to
+    // fetch a whole project to learn.
+    expect(result.parentSnapshotId).toBe('s1');
   });
 });
