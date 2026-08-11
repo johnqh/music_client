@@ -317,57 +317,46 @@ describe('MusicClient project status polling', () => {
   });
 });
 
-describe('stem separation', () => {
-  const separation = {
-    id: 'sep-1',
-    status: 'running' as const,
-    stems: [],
-    error: null,
-    createdAt: '2026-08-10T00:00:00.000Z',
-    finishedAt: null,
+describe('audio transcription', () => {
+  const project = {
+    id: 'p1',
+    name: 'west end girls',
+    createdAt: '2026-08-11T00:00:00.000Z',
+    updatedAt: '2026-08-11T00:00:00.000Z',
+    schemaVersion: 1,
+    status: 'transcribing' as const,
+    lastGenerationError: null,
+    uiPrefs: null,
+    parentSnapshotId: null,
   };
 
-  it('sends the audio as bytes, not JSON', async () => {
-    // Base64 inside a JSON envelope would add a third to the largest payload
-    // this client sends, to carry bytes that are already bytes.
-    const { client, calls } = fakeNetwork({ success: true, data: separation });
-    const audio = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' });
+  it('uploads the recording as multipart, with the filename', async () => {
+    // The filename is the only thing the user told us about the recording, and
+    // it becomes the project's name on the server.
+    const { client, calls } = fakeNetwork({ success: true, data: project });
+    const file = new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/mpeg' });
 
-    await new MusicClient(client, BASE).createSeparation(audio, 'tok');
+    await new MusicClient(client, BASE).transcribeAudio(file, 'west end girls.mp3', 'tok');
 
-    expect(calls[0].url).toBe(`${BASE}/api/v1/separations`);
+    expect(calls[0].url).toBe(`${BASE}/api/v1/projects/transcribe`);
     expect(calls[0].options?.method).toBe('POST');
-    expect(calls[0].options?.body).toBe(audio);
-    expect(calls[0].options?.headers?.['Content-Type']).toBe('audio/wav');
+    expect(calls[0].options?.body).toBeInstanceOf(FormData);
+    const form = calls[0].options?.body as FormData;
+    expect((form.get('file') as File).name).toBe('west end girls.mp3');
+  });
+
+  it('leaves the content type to the platform, so multipart gets its boundary', async () => {
+    // A hand-written multipart header has no boundary parameter, and a server
+    // cannot parse the body without one.
+    const { client, calls } = fakeNetwork({ success: true, data: project });
+    await new MusicClient(client, BASE).transcribeAudio(new Blob(['x']), 'a.wav', 'tok');
+    expect(calls[0].options?.headers?.['Content-Type']).toBeUndefined();
     expect(calls[0].options?.headers?.['Authorization']).toBe('Bearer tok');
   });
 
-  it('does not gzip the audio, which would be a pass over megabytes for nothing', async () => {
-    const { client, calls } = fakeNetwork({ success: true, data: separation });
-    const audio = new Blob([new Uint8Array(4096)], { type: 'audio/wav' });
-
-    await new MusicClient(client, BASE).createSeparation(audio, 'tok');
-
-    expect(calls[0].options?.headers?.['Content-Encoding']).toBeUndefined();
-  });
-
-  it('returns the separation as the server reported it', async () => {
-    const ready = { ...separation, status: 'ready' as const, stems: ['vocals', 'drums'] };
-    const { client } = fakeNetwork({ success: true, data: ready });
-
-    expect(await new MusicClient(client, BASE).getSeparation('sep-1', 'tok')).toEqual(ready);
-  });
-
-  it('polls status by id', async () => {
-    const { client, calls } = fakeNetwork({ success: true, data: separation });
-    await new MusicClient(client, BASE).getSeparation('sep 1/x', 'tok');
-    expect(calls[0].url).toBe(`${BASE}/api/v1/separations/sep%201%2Fx`);
-  });
-
-  it('builds a stem URL callers do not have to know the shape of', async () => {
-    const { client } = fakeNetwork({ success: true, data: separation });
-    expect(new MusicClient(client, BASE).stemUrl('sep-1', 'vocals')).toBe(
-      `${BASE}/api/v1/separations/sep-1/stems/vocals`
-    );
+  it('returns the project, which comes back still transcribing', async () => {
+    const { client } = fakeNetwork({ success: true, data: project });
+    const saved = await new MusicClient(client, BASE).transcribeAudio(new Blob(['x']), 'a.wav', 'tok');
+    expect(saved.status).toBe('transcribing');
   });
 });

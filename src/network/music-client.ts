@@ -25,8 +25,6 @@ import type {
   SnapshotSummary,
   RegenerateRegionRequest,
   RegenerateRegionResult,
-  Separation,
-  StemKind,
 } from '@sudobility/music_types';
 import {
   AiGenerationError,
@@ -87,7 +85,7 @@ type RequestOptions = {
    * with it — a WAV compresses a little, an MP3 not at all, and neither is
    * worth a pass over tens of megabytes.
    */
-  rawBody?: Blob;
+  rawBody?: Blob | FormData;
   contentType?: string;
   token?: string;
   signal?: AbortSignal;
@@ -109,10 +107,17 @@ export class MusicClient {
       headers['Authorization'] = `Bearer ${options.token}`;
     }
 
-    let body: string | Blob | undefined;
+    let body: string | Blob | FormData | undefined;
     if (options.rawBody !== undefined) {
       body = options.rawBody;
-      headers['Content-Type'] = options.contentType ?? 'application/octet-stream';
+      if (options.rawBody instanceof FormData) {
+        // Left to the platform: multipart needs a boundary parameter that only
+        // whatever sends the body can generate, and setting the header by hand
+        // produces one without it, which the server cannot parse.
+        delete headers['Content-Type'];
+      } else {
+        headers['Content-Type'] = options.contentType ?? 'application/octet-stream';
+      }
     } else if (options.body !== undefined) {
       const encoded = await encodeBody(JSON.stringify(options.body));
       body = encoded.body;
@@ -195,6 +200,38 @@ export class MusicClient {
     );
   }
 
+  // -- Audio transcription ---------------------------------------------------
+
+  /** Whether this deployment can transcribe audio at all. */
+  async getTranscriptionCapability(token: string): Promise<{ available: boolean }> {
+    return this.request<{ available: boolean }>('/projects/transcribe/capability', { token });
+  }
+
+  /**
+   * Uploads a recording and returns the project it created.
+   *
+   * The project comes back immediately with `status: 'transcribing'` and an
+   * empty score — transcription is minutes of model time on another service,
+   * and the score arrives on a later read. Poll `getProjectStatus` until it
+   * says `ready`.
+   *
+   * Multipart rather than raw bytes: the filename is the only thing the user
+   * told us about the recording, and it becomes the project's name.
+   */
+  async transcribeAudio(
+    file: File | Blob,
+    filename: string,
+    token: string
+  ): Promise<ProjectSaveResult> {
+    const form = new FormData();
+    form.append('file', file, filename);
+    return this.request<ProjectSaveResult>('/projects/transcribe', {
+      method: 'POST',
+      rawBody: form,
+      token,
+    });
+  }
+
   // -- Projects --------------------------------------------------------------
 
   listProjects(token: string, query?: ProjectListQuery): Promise<ProjectSummary[]> {
@@ -223,40 +260,6 @@ export class MusicClient {
     });
   }
 
-  // -- Stem separation -------------------------------------------------------
-
-  /**
-   * Starts a separation and returns as soon as the row exists.
-   *
-   * Separation takes tens of seconds to minutes, so this never waits for it —
-   * poll `getSeparation` until the status leaves `running`, the same shape a
-   * generation job uses.
-   */
-  async createSeparation(audio: Blob, token: string, signal?: AbortSignal): Promise<Separation> {
-    return this.request<Separation>('/separations', {
-      method: 'POST',
-      rawBody: audio,
-      contentType: audio.type || 'audio/wav',
-      token,
-      ...(signal ? { signal } : {}),
-    });
-  }
-
-  async getSeparation(id: string, token: string): Promise<Separation> {
-    return this.request<Separation>(`/separations/${encodeURIComponent(id)}`, { token });
-  }
-
-  /**
-   * The URL one stem's audio is served from.
-   *
-   * A URL rather than the bytes because `NetworkClient` parses every response
-   * as JSON, and a stem is megabytes of audio. The caller fetches it with a
-   * binary-capable request and the same bearer token — URL construction and
-   * the `/api/v1` prefix stay here so no caller has to know them.
-   */
-  stemUrl(id: string, kind: StemKind): string {
-    return `${this.baseUrl}${BASE_PATH}/separations/${encodeURIComponent(id)}/stems/${encodeURIComponent(kind)}`;
-  }
 
   /**
    * Creates a project. Returns metadata, not the score: the caller sent that
