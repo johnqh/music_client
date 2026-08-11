@@ -25,6 +25,8 @@ import type {
   SnapshotSummary,
   RegenerateRegionRequest,
   RegenerateRegionResult,
+  Separation,
+  StemKind,
 } from '@sudobility/music_types';
 import {
   AiGenerationError,
@@ -76,6 +78,17 @@ async function encodeBody(json: string): Promise<{ body: string | Blob; encoding
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
+  /**
+   * Sent as-is under `contentType`, instead of being JSON-encoded.
+   *
+   * For audio going up to be separated: it is already bytes, and putting it
+   * through `JSON.stringify` plus base64 would add a third to the largest
+   * payload this client sends to carry bytes that are bytes. Gzip is skipped
+   * with it — a WAV compresses a little, an MP3 not at all, and neither is
+   * worth a pass over tens of megabytes.
+   */
+  rawBody?: Blob;
+  contentType?: string;
   token?: string;
   signal?: AbortSignal;
 };
@@ -97,7 +110,10 @@ export class MusicClient {
     }
 
     let body: string | Blob | undefined;
-    if (options.body !== undefined) {
+    if (options.rawBody !== undefined) {
+      body = options.rawBody;
+      headers['Content-Type'] = options.contentType ?? 'application/octet-stream';
+    } else if (options.body !== undefined) {
       const encoded = await encodeBody(JSON.stringify(options.body));
       body = encoded.body;
       if (encoded.encoding) headers['Content-Encoding'] = encoded.encoding;
@@ -205,6 +221,41 @@ export class MusicClient {
     return this.request<ProjectStatusResult>(`/projects/${encodeURIComponent(id)}/status`, {
       token,
     });
+  }
+
+  // -- Stem separation -------------------------------------------------------
+
+  /**
+   * Starts a separation and returns as soon as the row exists.
+   *
+   * Separation takes tens of seconds to minutes, so this never waits for it —
+   * poll `getSeparation` until the status leaves `running`, the same shape a
+   * generation job uses.
+   */
+  async createSeparation(audio: Blob, token: string, signal?: AbortSignal): Promise<Separation> {
+    return this.request<Separation>('/separations', {
+      method: 'POST',
+      rawBody: audio,
+      contentType: audio.type || 'audio/wav',
+      token,
+      ...(signal ? { signal } : {}),
+    });
+  }
+
+  async getSeparation(id: string, token: string): Promise<Separation> {
+    return this.request<Separation>(`/separations/${encodeURIComponent(id)}`, { token });
+  }
+
+  /**
+   * The URL one stem's audio is served from.
+   *
+   * A URL rather than the bytes because `NetworkClient` parses every response
+   * as JSON, and a stem is megabytes of audio. The caller fetches it with a
+   * binary-capable request and the same bearer token — URL construction and
+   * the `/api/v1` prefix stay here so no caller has to know them.
+   */
+  stemUrl(id: string, kind: StemKind): string {
+    return `${this.baseUrl}${BASE_PATH}/separations/${encodeURIComponent(id)}/stems/${encodeURIComponent(kind)}`;
   }
 
   /**
