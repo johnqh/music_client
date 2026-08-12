@@ -28,6 +28,7 @@ Typed network client + React Query hooks for the ScoreSmith music_api. SudojoCli
 - `duplicateProject` exists so a copy never crosses the wire; `getProjectStatus` carries `parentSnapshotId` so nothing fetches a whole project to read one id.
 - music_lib's generation/project slices call `MusicClient` directly (their own abort/token discipline); the hooks exist for app-level views (dashboard)
 - `Optional<T>` from @sudobility/types permits null — normalize `response.data ?? undefined`
+- **A guard test enforces that this package runs on React Native** (`src/platform-free.test.ts`): no web-only global, no `import.meta`, and `CompressionStream` still gated behind a `typeof` check. `tsconfig.json` sets `lib: [..., "DOM"]` and `eslint.config.js` spreads `globals.browser` — both genuinely needed, since `fetch`/`Blob`/`File`/`FormData`/`AbortSignal`/`URLSearchParams` are declared in `lib.dom.d.ts` but implemented on React Native too. The cost is that neither the compiler nor the linter would ever object to `document.querySelector` here, and every test runs in jsdom where it would work fine. The guard is what objects. It greps raw source with comments stripped, so reword a doc comment rather than weakening a rule.
 
 ## Related Projects
 
