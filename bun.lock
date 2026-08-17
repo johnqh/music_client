@@ -5,11 +5,11 @@
     "": {
       "name": "@sudobility/music_client",
       "dependencies": {
-        "@sudobility/music_types": "^0.11.13",
+        "@sudobility/music_types": "^0.11.15",
       },
       "devDependencies": {
         "@eslint/js": "^9.38.0",
-        "@sudobility/types": "^1.9.64",
+        "@sudobility/types": "^1.9.65",
         "@tanstack/react-query": "^5.0.0",
         "@testing-library/react": "^16.3.0",
         "@types/node": "^26.1.2",
@@ -26,8 +26,8 @@
         "vitest": "^4.0.15",
       },
       "peerDependencies": {
-        "@sudobility/di": "^1.5.59",
-        "@sudobility/types": "^1.9.64",
+        "@sudobility/di": "^1.5.60",
+        "@sudobility/types": "^1.9.65",
         "@tanstack/react-query": ">=5",
         "react": ">=18",
       },
@@ -140,9 +140,9 @@
 
     "@sudobility/di": ["@sudobility/di@1.5.58", "", { "peerDependencies": { "@notifee/react-native": ">=7.0.0", "@react-native-async-storage/async-storage": ">=1.19.0", "@react-native-community/netinfo": ">=9.0.0", "@react-native-firebase/analytics": ">=18.0.0", "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/messaging": ">=18.0.0", "@react-native-firebase/remote-config": ">=18.0.0", "@sudobility/types": "^1.9.62", "firebase": ">=11.0.0", "react": ">=18.0.0", "react-native": ">=0.70.0" }, "optionalPeers": ["@notifee/react-native", "@react-native-async-storage/async-storage", "@react-native-community/netinfo", "@react-native-firebase/analytics", "@react-native-firebase/app", "@react-native-firebase/messaging", "@react-native-firebase/remote-config", "firebase", "react-native"] }, "sha512-0dheHIza5B+DrEZzj3eZUlE1gI3Rst0XFhboC8CDskEhXNhVd6THxlMhbj20hXC4zxB9Ore6n8YxFDOZbT1qaA=="],
 
-    "@sudobility/music_types": ["@sudobility/music_types@0.11.13", "", { "dependencies": { "zod": "^4.0.0" }, "peerDependencies": { "@sudobility/types": "^1.9.64" } }, "sha512-la8fv0xEpPRMYxvAC+zTP0cW1pR5fk3MZPsC3/Z/gyVcEwfT+4TlpzLDTl2agiGk/Xs7ezokYgOt10uQUeRC6Q=="],
+    "@sudobility/music_types": ["@sudobility/music_types@0.11.15", "", { "dependencies": { "zod": "^4.0.0" }, "peerDependencies": { "@sudobility/types": "^1.9.65" } }, "sha512-SNp5x5kHWcXM2ovzehHO3WxbCp9l+r2+nI7ZoBuRerjWY2hYep0cp7iS/iCgI4xExquy+jtJJWdFkieVp7UGrw=="],
 
-    "@sudobility/types": ["@sudobility/types@1.9.64", "", {}, "sha512-fiOxOM1vNK2Vp5B324POcRhq6XOoeoHInP3GbvGPmn8MvsoAl0hgO2X4gJh2VZIybFZwIdE4SD0dO1vu/JgFSA=="],
+    "@sudobility/types": ["@sudobility/types@1.9.65", "", {}, "sha512-NSq2/naehtQO3s6uhCa9+zGLQZkPNYhlb9NUtjS704ppvc+UbtGoSAzNQGLORDbha2YGJORE3/xs2UARZQdroA=="],
 
     "@tanstack/query-core": ["@tanstack/query-core@5.101.4", "", {}, "sha512-gNwcvOJcRbLWPOLG/2OBm+zM+Yv+MKsXKEOWC57USuZDEsI71hEErQsiEGx5wX9rzWWkfwM0fVSPoiIFSsxfiw=="],
 
