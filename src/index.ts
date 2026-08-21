@@ -6,6 +6,7 @@ export {
   AiGenerationError,
   AiOutputInvalidError,
   ApiError,
+  InsufficientCreditsError,
   ProjectNotFoundError,
   QuotaExceededError,
 } from './errors.js';

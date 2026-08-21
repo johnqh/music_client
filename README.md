@@ -1,6 +1,6 @@
 # @sudobility/music_client
 
-Typed client and React Query hooks for the ScoreSmith API: AI score generation and project persistence.
+Typed client and React Query hooks for the Moosiac API: AI score generation and project persistence.
 
 ## Installation
 

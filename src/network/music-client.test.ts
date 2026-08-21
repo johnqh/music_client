@@ -10,6 +10,7 @@ import {
   AiOutputInvalidError,
   ApiError,
   ProjectNotFoundError,
+  InsufficientCreditsError,
   QuotaExceededError,
 } from '../errors.js';
 
@@ -358,5 +359,51 @@ describe('audio transcription', () => {
     const { client } = fakeNetwork({ success: true, data: project });
     const saved = await new MusicClient(client, BASE).transcribeAudio(new Blob(['x']), 'a.wav', 'tok');
     expect(saved.status).toBe('transcribing');
+  });
+});
+
+describe('payment required', () => {
+  it('maps INSUFFICIENT_CREDITS to InsufficientCreditsError', async () => {
+    // Its own class because it is the one failure with a remedy: the UI sells
+    // credits instead of reporting a network problem.
+    const { client } = fakeNetwork(
+      { success: false, error: 'Not enough credits.', code: 'INSUFFICIENT_CREDITS' },
+      402
+    );
+    await expect(
+      new MusicClient(client, BASE).createJob(
+        { projectId: 'p1', kind: 'generate-score', request: {} as never },
+        't'
+      )
+    ).rejects.toBeInstanceOf(InsufficientCreditsError);
+  });
+
+  it('maps a bare 402 to it too, with no envelope code', async () => {
+    // The status alone is enough: a payment-required answer means the same
+    // thing whether or not the envelope names a code.
+    const { client } = fakeNetwork({ success: false, error: 'nope' }, 402);
+    await expect(
+      new MusicClient(client, BASE).createJob(
+        { projectId: 'p1', kind: 'generate-score', request: {} as never },
+        't'
+      )
+    ).rejects.toBeInstanceOf(InsufficientCreditsError);
+  });
+});
+
+describe('current user', () => {
+  it('asks who the token belongs to', async () => {
+    // The client gates Generate on the balance, and an administrator's work is
+    // free — so it has to ask, or it refuses what the server would accept.
+    const { client, calls } = fakeNetwork(
+      { success: true, data: { userId: 'u1', email: 'boss@example.com', siteAdmin: true } },
+      200
+    );
+
+    const me = await new MusicClient(client, BASE).getCurrentUser('tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/me`);
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+    expect(me).toEqual({ userId: 'u1', email: 'boss@example.com', siteAdmin: true });
   });
 });

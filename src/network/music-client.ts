@@ -17,6 +17,7 @@ import type {
   ProjectRecord,
   ProjectSaveResult,
   ProjectStatusResult,
+  CurrentUser,
   ProjectSummary,
   ProjectUpdateRequest,
   CommunityItem,
@@ -31,6 +32,7 @@ import {
   AiOutputInvalidError,
   ApiError,
   ProjectNotFoundError,
+  InsufficientCreditsError,
   QuotaExceededError,
 } from '../errors.js';
 
@@ -262,6 +264,17 @@ export class MusicClient {
 
 
   /**
+   * Who the token belongs to, and whether they are a site administrator.
+   *
+   * Administrators generate for free — the server charges them nothing and
+   * checks no balance — so a client that gates on the balance has to ask, or
+   * it refuses work the server would accept.
+   */
+  async getCurrentUser(token: string): Promise<CurrentUser> {
+    return this.request<CurrentUser>('/me', { token });
+  }
+
+  /**
    * Creates a project. Returns metadata, not the score: the caller sent that
    * score a moment ago and still holds it, so echoing it back doubles the cost
    * of every create — and of every autosave, on `updateProject` below.
@@ -391,7 +404,10 @@ function mapError(status: number, envelope: ApiResponse<unknown> | undefined): E
       return new AiGenerationError(message);
     case 'PROJECT_NOT_FOUND':
       return new ProjectNotFoundError(message);
+    case 'INSUFFICIENT_CREDITS':
+      return new InsufficientCreditsError(message);
     default:
+      if (status === 402) return new InsufficientCreditsError(message);
       if (status === 429) return new QuotaExceededError(message);
       if (status === 404) return new ProjectNotFoundError(message);
       return new ApiError(message, status);

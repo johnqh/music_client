@@ -5,7 +5,7 @@
 > explicitly asks in that turn**. Approval for an earlier change does not carry forward, and
 > finishing a task is not permission to commit it.
 
-Typed network client + React Query hooks for the ScoreSmith music_api. SudojoClient pattern.
+Typed network client + React Query hooks for the Moosiac music_api. SudojoClient pattern.
 
 ## Tech Stack
 
