@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/music_client",
-  "version": "0.4.33",
+  "version": "0.4.34",
   "description": "Typed network client + React Query hooks for the ScoreSmith music_api",
   "type": "module",
   "main": "./dist/index.js",
@@ -35,7 +35,7 @@
   "author": "Sudobility",
   "license": "BUSL-1.1",
   "dependencies": {
-    "@sudobility/music_types": "^0.11.33"
+    "@sudobility/music_types": "^0.11.34"
   },
   "peerDependencies": {
     "@sudobility/di": "^1.5.61",
