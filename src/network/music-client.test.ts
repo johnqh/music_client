@@ -214,9 +214,19 @@ describe('MusicClient publishing', () => {
 
   it('publishes with a token', async () => {
     const { client, calls } = fakeNetwork({ success: true, data: {} });
-    await new MusicClient(client, BASE).publishSnapshot('s1', 'Jane', 'tok');
+    await new MusicClient(client, BASE).publishSnapshot(
+      's1',
+      { publisherName: 'Jane', publicName: 'My Song Version 1' },
+      'tok'
+    );
     expect(calls[0].url).toBe(`${BASE}/api/v1/snapshots/s1/publish`);
     expect(headersOf(calls).Authorization).toBe('Bearer tok');
+    // Both names have to reach the server: the publisher is attribution, the
+    // public name is the title a stranger reads.
+    expect(JSON.parse(calls[0].options?.body as string)).toEqual({
+      publisherName: 'Jane',
+      publicName: 'My Song Version 1',
+    });
   });
 
   it('unpublishes with a token', async () => {

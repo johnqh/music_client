@@ -344,11 +344,23 @@ export class MusicClient {
     });
   }
 
-  /** Publishing changes who may read the score, never the score — so neither response carries one. */
-  publishSnapshot(id: string, publisherName: string, token: string): Promise<SnapshotSummary> {
+  /**
+   * Publishing changes who may read the score, never the score — so neither
+   * response carries one.
+   *
+   * Called again on an already-published snapshot to rename it: the server
+   * keeps the first `publicId`, so a link already shared stays valid. The two
+   * names travel as an object rather than as positional strings, since they
+   * are both strings and the wrong order would type-check.
+   */
+  publishSnapshot(
+    id: string,
+    names: { publisherName: string; publicName: string },
+    token: string
+  ): Promise<SnapshotSummary> {
     return this.request<SnapshotSummary>(`/snapshots/${encodeURIComponent(id)}/publish`, {
       method: 'POST',
-      body: { publisherName },
+      body: names,
       token,
     });
   }
