@@ -5,6 +5,28 @@
  * (never stored), envelope unwrapping and typed-error mapping in one place.
  */
 import type { NetworkClient } from '@sudobility/types';
+
+/**
+ * A file on its way to the server, in whichever form the platform can offer.
+ *
+ * A browser hands over the `File` the user picked. React Native hands over a
+ * **path** — its `Blob` cannot be built from an `ArrayBuffer`, so there is no
+ * way to turn a recording into bytes this side of the request, and its
+ * networking layer streams `{ uri, name, type }` itself. Naming both here is
+ * what lets one client serve both, rather than the native app growing an
+ * uploader that would have to repeat this route, its field name, its auth and
+ * its error mapping.
+ */
+export type NativeUploadFile = {
+  /** A `file://` or content URI the platform can read. */
+  uri: string;
+  /** The filename the server should see. */
+  name: string;
+  /** The MIME type; RN will not infer one. */
+  type: string;
+};
+
+export type UploadableFile = File | Blob | NativeUploadFile;
 import type {
   ApiResponse,
   CreateGenerationJobRequest,
@@ -221,12 +243,29 @@ export class MusicClient {
    * told us about the recording, and it becomes the project's name.
    */
   async transcribeAudio(
-    file: File | Blob,
+    file: UploadableFile,
     filename: string,
     token: string
   ): Promise<ProjectSaveResult> {
     const form = new FormData();
-    form.append('file', file, filename);
+    /*
+      Two shapes, because the two platforms hand a file over differently and
+      neither can do it the other's way.
+
+      A browser has the `File` the user picked and appends it directly. React
+      Native has a **path**, not bytes: its `Blob` cannot be constructed from an
+      `ArrayBuffer` at all (`BlobManager` throws "Creating blobs from
+      'ArrayBuffer' and 'ArrayBufferView' are not supported"), so reading the
+      recording in order to upload it is not an option — and would mean holding
+      a whole audio file in memory even if it were. Instead RN's networking
+      layer streams the file itself when handed `{ uri, name, type }`, which is
+      the platform's own multipart convention.
+
+      Widened here rather than by giving the native app its own uploader: the
+      route, the field name, the auth and the error mapping are all this
+      client's, and a second copy of them is a second thing to keep in step.
+    */
+    form.append('file', file as unknown as Blob, filename);
     return this.request<ProjectSaveResult>('/projects/transcribe', {
       method: 'POST',
       rawBody: form,

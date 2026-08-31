@@ -2,6 +2,10 @@
  * @sudobility/music_client — typed gateway + React Query hooks for music_api.
  */
 export { MusicClient } from './network/music-client.js';
+export type {
+  NativeUploadFile,
+  UploadableFile,
+} from './network/music-client.js';
 export {
   AiGenerationError,
   AiOutputInvalidError,
