@@ -35,6 +35,9 @@ Typed network client + React Query hooks for the Moosiac music_api. SudojoClient
 - `Optional<T>` from @sudobility/types permits null — normalize `response.data ?? undefined`
 - **A guard test enforces that this package runs on React Native** (`src/platform-free.test.ts`): no web-only global, no `import.meta`, and `CompressionStream` still gated behind a `typeof` check. `tsconfig.json` sets `lib: [..., "DOM"]` and `eslint.config.js` spreads `globals.browser` — both genuinely needed, since `fetch`/`Blob`/`File`/`FormData`/`AbortSignal`/`URLSearchParams` are declared in `lib.dom.d.ts` but implemented on React Native too. The cost is that neither the compiler nor the linter would ever object to `document.querySelector` here, and every test runs in jsdom where it would work fine. The guard is what objects. It greps raw source with comments stripped, so reword a doc comment rather than weakening a rule.
 
+- **`useScorePresets` takes a nullable context and is not gated on a token.** Every other query here is gated on `ctx.token`; this one must not be, because the route is public and gating it would leave the menu empty until Firebase restored the session. `null` means there is no server at all — the native app opens local documents with no `MusicClient` — and the query simply does not run rather than failing on every mount. `staleTime` is `Infinity`: the list changes when the server is deployed, and a reader who has the dialog open through a deploy is not the case worth a refetch loop.
+- **`getScorePresets` validates rather than trusts.** The host renders these by looking each id up in its own copy, so an id it has never heard of prints as its own name in a menu. An unrecognisable body answers an empty list, which is what the menu hides itself on.
+
 ## Related Projects
 
 `music_types` · `music_api` · `music_lib` · `music_app`

@@ -48,7 +48,9 @@ import type {
   SnapshotSummary,
   RegenerateRegionRequest,
   RegenerateRegionResult,
+  ScorePresetKey,
 } from '@sudobility/music_types';
+import { scorePresetsResponseSchema } from '@sudobility/music_types';
 import {
   AiGenerationError,
   AiOutputInvalidError,
@@ -423,6 +425,26 @@ export class MusicClient {
 
   listCommunity(): Promise<CommunityItem[]> {
     return this.request<CommunityItem[]>('/public/community', {});
+  }
+
+  /**
+   * The briefs offered as starting points for a style.
+   *
+   * Ids, not prompts: the words live in each app's locale files, so a Chinese
+   * reader picks a brief in Chinese and prompts the model in Chinese. Which
+   * briefs suit which genre is the server's, so two apps cannot offer
+   * different starting points for the same style.
+   *
+   * Public, so no token — and validated here rather than trusted, because the
+   * host renders these by looking each id up in its own copy: an id it has
+   * never heard of would print as its own name in a menu. An unrecognisable
+   * body answers an empty list, which is what the menu hides itself on.
+   */
+  async getScorePresets(style?: string): Promise<ScorePresetKey[]> {
+    const query = style ? `?style=${encodeURIComponent(style)}` : '';
+    const data = await this.request<unknown>(`/public/presets${query}`, {});
+    const parsed = scorePresetsResponseSchema.safeParse(data);
+    return parsed.success ? parsed.data.presets : [];
   }
 
   async deleteProject(id: string, token: string): Promise<void> {

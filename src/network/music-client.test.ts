@@ -417,3 +417,52 @@ describe('current user', () => {
     expect(me).toEqual({ userId: 'u1', email: 'boss@example.com', siteAdmin: true });
   });
 });
+
+describe('MusicClient presets', () => {
+  const headersOf = (calls: Recorded[]): Record<string, string> =>
+    (calls[0].options?.headers as Record<string, string> | undefined) ?? {};
+
+  it('reads the briefs for a style, without a token', async () => {
+    // A public route: presets have no owner, and asking for a token would put
+    // this fetch into the race a bearer token loses at start-up.
+    const { client, calls } = fakeNetwork({ success: true, data: { presets: [] } });
+    await new MusicClient(client, BASE).getScorePresets('reggae');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/public/presets?style=reggae`);
+    expect(headersOf(calls).Authorization).toBeUndefined();
+  });
+
+  it('asks for the general set when no style is chosen', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { presets: [] } });
+    await new MusicClient(client, BASE).getScorePresets();
+    expect(calls[0].url).toBe(`${BASE}/api/v1/public/presets`);
+  });
+
+  it('encodes a style rather than pasting it into the query', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { presets: [] } });
+    await new MusicClient(client, BASE).getScorePresets('bossa nova & more');
+    expect(calls[0].url).toBe(
+      `${BASE}/api/v1/public/presets?style=bossa%20nova%20%26%20more`
+    );
+  });
+
+  it('returns the briefs the server listed', async () => {
+    const { client } = fakeNetwork({
+      success: true,
+      data: { presets: ['organStabs', 'lockedGroove'] },
+    });
+    expect(await new MusicClient(client, BASE).getScorePresets('reggae')).toEqual([
+      'organStabs',
+      'lockedGroove',
+    ]);
+  });
+
+  it('answers nothing for a body it cannot recognise, rather than throwing', async () => {
+    /*
+      The menu hides itself on an empty list, so a server one version ahead —
+      or a proxy answering HTML — costs the reader a button rather than the
+      whole dialog.
+    */
+    const { client } = fakeNetwork({ success: true, data: { presets: ['notAKey'] } });
+    expect(await new MusicClient(client, BASE).getScorePresets()).toEqual([]);
+  });
+});

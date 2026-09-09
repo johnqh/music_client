@@ -43,3 +43,4 @@ export {
   useGenerationJob,
   useRegenerateRegion,
 } from './hooks/use-generation.js';
+export { useScorePresets } from './hooks/use-presets.js';
