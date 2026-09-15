@@ -7,5 +7,5 @@
     "sourceMap": true,
     "noEmit": false
   },
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx", "src/test/**"]
 }

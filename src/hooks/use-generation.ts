@@ -11,6 +11,7 @@ import type {
 } from '@sudobility/music_types';
 import { musicQueryKeys } from './query-keys.js';
 import { useMusicClient, type MusicHookContext } from './use-projects.js';
+import { hookAuthEnabled, requireHookToken } from './hook-context.js';
 
 /** How often a running job is checked. Minutes of work, so seconds of latency cost nothing. */
 const JOB_POLL_MS = 3000;
@@ -18,16 +19,16 @@ const JOB_POLL_MS = 3000;
 export function useGenerateScore(ctx: MusicHookContext) {
   const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
   return useMutation({
-    mutationFn: ({ req, signal }: { req: GenerateScoreRequest; signal?: AbortSignal }) =>
-      client.generateScore(req, ctx.token as string, signal),
+    mutationFn: async ({ req, signal }: { req: GenerateScoreRequest; signal?: AbortSignal }) =>
+      client.generateScore(req, await requireHookToken(ctx), signal),
   });
 }
 
 export function useRegenerateRegion(ctx: MusicHookContext) {
   const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
   return useMutation({
-    mutationFn: ({ req, signal }: { req: RegenerateRegionRequest; signal?: AbortSignal }) =>
-      client.regenerateRegion(req, ctx.token as string, signal),
+    mutationFn: async ({ req, signal }: { req: RegenerateRegionRequest; signal?: AbortSignal }) =>
+      client.regenerateRegion(req, await requireHookToken(ctx), signal),
   });
 }
 
@@ -35,14 +36,15 @@ export function useRegenerateRegion(ctx: MusicHookContext) {
 export function useCreateGenerationJob(ctx: MusicHookContext) {
   const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
   return useMutation({
-    mutationFn: (req: CreateGenerationJobRequest) => client.createJob(req, ctx.token as string),
+    mutationFn: async (req: CreateGenerationJobRequest) =>
+      client.createJob(req, await requireHookToken(ctx)),
   });
 }
 
 export function useCancelGenerationJob(ctx: MusicHookContext) {
   const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
   return useMutation({
-    mutationFn: (id: string) => client.cancelJob(id, ctx.token as string),
+    mutationFn: async (id: string) => client.cancelJob(id, await requireHookToken(ctx)),
   });
 }
 
@@ -57,8 +59,8 @@ export function useGenerationJob(ctx: MusicHookContext, id: string | null) {
   const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
   return useQuery({
     queryKey: musicQueryKeys.jobs.detail(id ?? ''),
-    enabled: id !== null && ctx.token !== null,
-    queryFn: () => client.getJob(id as string, ctx.token as string),
+    enabled: id !== null && hookAuthEnabled(ctx),
+    queryFn: async () => client.getJob(id as string, await requireHookToken(ctx)),
     refetchInterval: (query) => (query.state.data?.status === 'running' ? JOB_POLL_MS : false),
   });
 }

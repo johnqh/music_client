@@ -22,7 +22,9 @@ Typed network client + React Query hooks for the Moosiac music_api. SudojoClient
 ## Architecture
 
 - `src/network/music-client.ts` — `MusicClient(networkClient, baseUrl)`: one private `request<T>()` funnel; bearer token per call (never stored); envelope `{success,data,error,code}` unwrapping; typed-error mapping (429/QUOTA_EXCEEDED → `QuotaExceededError`, 502 AI codes → `AiOutputInvalidError`/`AiGenerationError`, 404 → `ProjectNotFoundError`, else `ApiError`)
-- `src/hooks/` — `useProjects`/`useProject`/`useCreateProject`/`useUpdateProject`/`useDeleteProject`, `useGenerateScore`/`useRegenerateRegion`; every hook takes `{networkClient, baseUrl, token}` (`MusicHookContext`); queries disabled when token is null
+- `src/hooks/` — `useProjects` (optional `pollWhileGenerating`)/`useProject`/`useCreateProject`/`useUpdateProject`/`useDeleteProject`/`useDuplicateProject`/`useCancelProjectGeneration`, `useGenerateScore`/`useRegenerateRegion`, `useSiteAdmin`, `useTranscriptionCapability`, `useProjectSnapshots`; every hook takes a `MusicHookContext` (`hook-context.ts`)
+- `src/projects/create-generated-project.ts` — `createGeneratedProject`: create the project, start the job, delete the project if the job is refused. The one copy of what both dashboards did
+- `src/test/fake-server.tsx` — routed fake of music_api for hook tests (excluded from the build)
 - `src/hooks/query-keys.ts` — `musicQueryKeys` hierarchical factory; mutations invalidate through it
 - Stale times: projects list 2min; project detail 0 (editor owns freshness)
 
@@ -37,6 +39,10 @@ Typed network client + React Query hooks for the Moosiac music_api. SudojoClient
 
 - **`useScorePresets` takes a nullable context and is not gated on a token.** Every other query here is gated on `ctx.token`; this one must not be, because the route is public and gating it would leave the menu empty until Firebase restored the session. `null` means there is no server at all — the native app opens local documents with no `MusicClient` — and the query simply does not run rather than failing on every mount. `staleTime` is `Infinity`: the list changes when the server is deployed, and a reader who has the dialog open through a deploy is not the case worth a refetch loop.
 - **`getScorePresets` validates rather than trusts.** The host renders these by looking each id up in its own copy, so an id it has never heard of prints as its own name in a menu. An unrecognisable body answers an empty list, which is what the menu hides itself on.
+
+- **The hook context resolves its token per request.** `MusicHookContext.getToken` is awaited at the moment each request is sent (`requireHookToken`), because a token captured into the context goes stale an hour into a session and one read at start-up is null until Firebase restores the session. `userId` (`null` = signed out) is what gates queries synchronously and keys per-account caches — `useSiteAdmin` is keyed by it so one account's `true` is never shown for the next. The old captured `token` field still works when `getToken` is absent, and is deprecated.
+- **`useProjectSnapshots` never re-downloads the project.** Create flushes (host's `flush`), creates, re-reads list+status and hands `status.updatedAt` to `noteServerVersion`; open takes the score from `openSnapshot`'s own response to `onAdopt`, then notes `project.updatedAt`. Blank names are refused before anything is sent, including a publish-on-create — no snapshot is made if its publish would be refused. `rename` reads the cache rather than the render, so a rename straight after a publish sees it.
+- **`isInsufficientCredits` checks the error's name as well as its class.** Two copies of this package in one bundle make `instanceof` false for the other copy's error, and the paywall silently becomes a toast.
 
 ## Related Projects
 

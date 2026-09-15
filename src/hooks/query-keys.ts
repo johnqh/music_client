@@ -17,6 +17,21 @@ export const musicQueryKeys = {
     // for "no style", since a key holding `undefined` is not a stable key.
     forStyle: (style?: string) => ['music', 'presets', style ?? ''] as const,
   },
+  snapshots: {
+    all: ['music', 'snapshots'] as const,
+    /** A project's snapshot list together with where the live work hangs off it. */
+    forProject: (projectId: string) => ['music', 'snapshots', 'project', projectId] as const,
+    /** The name this account last published under — per account, not per project. */
+    publisherName: (userId?: string | null) => ['music', 'snapshots', 'publisher-name', userId ?? ''] as const,
+  },
+  /**
+   * Per account: keyed by user id so one account's answer is never read back
+   * for the next one signed in on the same device.
+   */
+  me: (userId?: string | null) => ['music', 'me', userId ?? ''] as const,
+  transcription: {
+    capability: ['music', 'transcription', 'capability'] as const,
+  },
   jobs: {
     all: ['music', 'jobs'] as const,
     detail: (id: string) => ['music', 'jobs', 'detail', id] as const,
