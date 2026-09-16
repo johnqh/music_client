@@ -15,22 +15,10 @@
 import {
   emptyScoreForRequest,
   withGenerationVariant,
-  type GenerateScoreRequest,
+  type NewProjectSubmission,
   type ProjectSaveResult,
-  type Score,
 } from '@sudobility/music_types';
 import type { MusicClient } from '../network/music-client.js';
-
-/**
- * What the New Project form decided.
- *
- * Structurally identical to music_lib's `NewProjectSubmission`, written out
- * here because this package may not depend on music_lib; a music_lib value is
- * assignable to it as-is.
- */
-export type GeneratedProjectSubmission =
-  | { kind: 'generate'; request: GenerateScoreRequest }
-  | { kind: 'blank'; title: string; score: Score };
 
 /** The three calls this makes, so a test can stub them. */
 export type GeneratedProjectClient = Pick<MusicClient, 'createProject' | 'createJob' | 'deleteProject'>;
@@ -70,7 +58,7 @@ export type CreateGeneratedProjectOptions = {
 export async function createGeneratedProject(
   client: GeneratedProjectClient,
   token: string,
-  submission: GeneratedProjectSubmission,
+  submission: NewProjectSubmission,
   options: CreateGeneratedProjectOptions = {}
 ): Promise<ProjectSaveResult> {
   if (submission.kind === 'blank') {

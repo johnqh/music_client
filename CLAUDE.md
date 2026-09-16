@@ -5,7 +5,7 @@
 > explicitly asks in that turn**. Approval for an earlier change does not carry forward, and
 > finishing a task is not permission to commit it.
 
-Typed network client + React Query hooks for the Moosiac music_api. SudojoClient pattern.
+The network, and only the network: the typed `MusicClient` for the Moosiac music_api, its React Query hooks, and the generation-job and snapshot hooks built on them. SudojoClient pattern. The shapes it sends and receives — including the submission and publish types it once declared itself — are music_types'.
 
 ## Tech Stack
 
@@ -29,6 +29,9 @@ Typed network client + React Query hooks for the Moosiac music_api. SudojoClient
 - Stale times: projects list 2min; project detail 0 (editor owns freshness)
 
 ## Gotchas
+
+- **`NewProjectSubmission` is music_types'.** This package used to write out `GeneratedProjectSubmission` as a structural copy of music_lib's type, because it may not depend on music_lib; the shape is vocabulary, so it moved below both and the two names became one. `GenerationErrorKind` and `PublishNames` moved with it. `GenerationStore` stays structural here — it is a store shape music_lib satisfies, not vocabulary. `src/__moved-to-types.test.ts` fails if any of the four is declared or re-exported here again. music_lib does not re-export this package, so a duplicate here would not be the TS2308 / "Cannot redefine property" failure it is in the packages music_lib re-exports wholesale; it is the quieter one — an app importing this package beside music_lib, which re-exports music_types, reaches two declarations of one name, and a structural copy agrees with the original only until one of them is edited.
+
 
 - **Reads return the score; writes return metadata about it.** `createProject`/`updateProject` resolve to `ProjectSaveResult` and the snapshot writes to `SnapshotSummary` — none carries a `score`. The caller sent that score a moment ago and still holds it, so echoing it back doubled the cost of every create and every autosave. `useUpdateProject` therefore *patches* the cached detail entry (keeping the score from the request, or the one already cached) rather than writing the response into it, which would replace a cached project with a score-less one.
 - **`request()` gzips bodies over 1KB** and sets `Content-Encoding`. A browser gzips responses it *receives* automatically and bodies it *sends* never, so uploading a score — what an autosave does every debounce window — was the one leg still paying full price. Gated on `CompressionStream` (absent on React Native's engine) and falling back to the plain string on any failure: never fail a save over an optimisation. Compression goes through `new Response(json).body`, **not** `Blob.stream()` — jsdom has no `Blob.stream`, so the Blob route degrades silently in exactly the environment the tests run in, and the feature would never have been exercised.

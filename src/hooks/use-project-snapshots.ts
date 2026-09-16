@@ -30,6 +30,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   snapshotTree,
   type ProjectRecord,
+  type PublishNames,
   type Score,
   type SnapshotSummary,
   type TreeNode,
@@ -37,8 +38,6 @@ import {
 import { musicQueryKeys } from './query-keys.js';
 import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context.js';
 import { useMusicClient } from './use-projects.js';
-
-export type PublishNames = { publisherName: string; publicName: string };
 
 /**
  * The public title offered for a new snapshot: the project's name, then the

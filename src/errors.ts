@@ -2,6 +2,7 @@
  * Typed errors mapped from music_api's envelope codes / HTTP statuses so UI
  * layers can branch on error class instead of parsing messages.
  */
+import type { GenerationErrorKind } from '@sudobility/music_types';
 
 export class QuotaExceededError extends Error {
   constructor(message = 'Daily AI generation limit reached.') {
@@ -70,9 +71,6 @@ export function isInsufficientCredits(err: unknown): boolean {
   if (err instanceof ApiError && err.status === 402) return true;
   return err instanceof Error && err.name === 'InsufficientCreditsError';
 }
-
-/** How a UI should present a failed generation. */
-export type GenerationErrorKind = 'paywall' | 'error';
 
 /**
  * Where a failed generation goes: the store, or an ordinary error message.

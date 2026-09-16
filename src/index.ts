@@ -16,7 +16,6 @@ export {
   classifyGenerationError,
   isInsufficientCredits,
 } from './errors.js';
-export type { GenerationErrorKind } from './errors.js';
 export {
   hookAuthEnabled,
   requireHookToken,
@@ -30,7 +29,6 @@ export {
 export type {
   CreateGeneratedProjectOptions,
   GeneratedProjectClient,
-  GeneratedProjectSubmission,
 } from './projects/create-generated-project.js';
 export { musicQueryKeys } from './hooks/query-keys.js';
 export {
@@ -69,7 +67,6 @@ export {
   useProjectSnapshots,
   type ProjectSnapshots,
   type ProjectSnapshotsCallbacks,
-  type PublishNames,
 } from './hooks/use-project-snapshots.js';
 export {
   useCancelGenerationJob,
