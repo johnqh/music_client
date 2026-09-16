@@ -1,6 +1,6 @@
 {
   "name": "@sudobility/music_client",
-  "version": "0.4.64",
+  "version": "0.4.65",
   "description": "Typed network client + React Query hooks for the ScoreSmith music_api",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,11 +15,11 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "clean": "rimraf dist",
-    "test": "vitest run",
+    "test:unit": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "verify": "bun run typecheck && bun run lint && bun run test && bun run build",
+    "verify": "bun run typecheck && bun run lint && bun run test:unit && bun run build",
     "prepublishOnly": "bun run clean && bun run verify"
   },
   "files": [
@@ -35,7 +35,7 @@
   "author": "Sudobility",
   "license": "BUSL-1.1",
   "dependencies": {
-    "@sudobility/music_types": "^0.13.27"
+    "@sudobility/music_types": "^0.13.28"
   },
   "peerDependencies": {
     "@sudobility/di": "^1.5.65",
