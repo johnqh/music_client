@@ -17,6 +17,9 @@ export const musicQueryKeys = {
     // for "no style", since a key holding `undefined` is not a stable key.
     forStyle: (style?: string) => ['music', 'presets', style ?? ''] as const,
   },
+  styleSettings: {
+    all: ['music', 'style-settings'] as const,
+  },
   snapshots: {
     all: ['music', 'snapshots'] as const,
     /** A project's snapshot list together with where the live work hangs off it. */

@@ -49,8 +49,12 @@ import type {
   RegenerateRegionRequest,
   RegenerateRegionResult,
   ScorePresetKey,
+  GenerateScoreStyleSettings,
 } from '@sudobility/music_types';
-import { scorePresetsResponseSchema } from '@sudobility/music_types';
+import {
+  scorePresetsResponseSchema,
+  generateScoreStyleSettingsResponseSchema,
+} from '@sudobility/music_types';
 import {
   AiGenerationError,
   AiOutputInvalidError,
@@ -445,6 +449,13 @@ export class MusicClient {
     const data = await this.request<unknown>(`/public/presets${query}`, {});
     const parsed = scorePresetsResponseSchema.safeParse(data);
     return parsed.success ? parsed.data.presets : [];
+  }
+
+  /** Public, backend-owned controls used to constrain generation forms. */
+  async getScoreStyleSettings(): Promise<GenerateScoreStyleSettings> {
+    const data = await this.request<unknown>('/public/style-settings', {});
+    const parsed = generateScoreStyleSettingsResponseSchema.safeParse(data);
+    return parsed.success ? parsed.data.styles : {};
   }
 
   async deleteProject(id: string, token: string): Promise<void> {

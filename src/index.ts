@@ -76,3 +76,4 @@ export {
   useRegenerateRegion,
 } from './hooks/use-generation.js';
 export { useScorePresets } from './hooks/use-presets.js';
+export { useScoreStyleSettings } from './hooks/use-style-settings.js';

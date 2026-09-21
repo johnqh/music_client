@@ -465,4 +465,37 @@ describe('MusicClient presets', () => {
     const { client } = fakeNetwork({ success: true, data: { presets: ['notAKey'] } });
     expect(await new MusicClient(client, BASE).getScorePresets()).toEqual([]);
   });
+
+  it('reads backend-owned style settings without a token', async () => {
+    const { client, calls } = fakeNetwork({
+      success: true,
+      data: {
+        styles: {
+          ambient: {
+            tempo: 70,
+            minBpm: 66,
+            maxBpm: 74,
+            timeSignature: '4/4',
+            keys: [0, -1, 1, 2],
+          },
+        },
+      },
+    });
+    expect(await new MusicClient(client, BASE).getScoreStyleSettings()).toEqual({
+      ambient: {
+        tempo: 70,
+        minBpm: 66,
+        maxBpm: 74,
+        timeSignature: '4/4',
+        keys: [0, -1, 1, 2],
+      },
+    });
+    expect(calls[0].url).toBe(`${BASE}/api/v1/public/style-settings`);
+    expect(headersOf(calls).Authorization).toBeUndefined();
+  });
+
+  it('answers no settings for an unrecognisable response', async () => {
+    const { client } = fakeNetwork({ success: true, data: { styles: [] } });
+    expect(await new MusicClient(client, BASE).getScoreStyleSettings()).toEqual({});
+  });
 });
