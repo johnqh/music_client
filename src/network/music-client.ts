@@ -62,7 +62,7 @@ import {
   ProjectNotFoundError,
   InsufficientCreditsError,
   QuotaExceededError,
-} from '../errors.js';
+} from '../errors';
 
 const BASE_PATH = '/api/v1';
 

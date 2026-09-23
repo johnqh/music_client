@@ -18,7 +18,7 @@ import {
   type NewProjectSubmission,
   type ProjectSaveResult,
 } from '@sudobility/music_types';
-import type { MusicClient } from '../network/music-client.js';
+import type { MusicClient } from '../network/music-client';
 
 /** The three calls this makes, so a test can stub them. */
 export type GeneratedProjectClient = Pick<MusicClient, 'createProject' | 'createJob' | 'deleteProject'>;

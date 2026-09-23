@@ -1,11 +1,11 @@
 /**
  * @sudobility/music_client — typed gateway + React Query hooks for music_api.
  */
-export { MusicClient } from './network/music-client.js';
+export { MusicClient } from './network/music-client';
 export type {
   NativeUploadFile,
   UploadableFile,
-} from './network/music-client.js';
+} from './network/music-client';
 export {
   AiGenerationError,
   AiOutputInvalidError,
@@ -15,35 +15,35 @@ export {
   QuotaExceededError,
   classifyGenerationError,
   isInsufficientCredits,
-} from './errors.js';
+} from './errors';
 export {
   hookAuthEnabled,
   requireHookToken,
   resolveHookToken,
   type MusicHookContext,
-} from './hooks/hook-context.js';
+} from './hooks/hook-context';
 export {
   GENERATED_PROJECT_FALLBACK_NAME,
   createGeneratedProject,
-} from './projects/create-generated-project.js';
+} from './projects/create-generated-project';
 export type {
   CreateGeneratedProjectOptions,
   GeneratedProjectClient,
-} from './projects/create-generated-project.js';
-export { musicQueryKeys } from './hooks/query-keys.js';
+} from './projects/create-generated-project';
+export { musicQueryKeys } from './hooks/query-keys';
 export {
   ALWAYS_FOREGROUND,
   GENERATION_IDLE_POLL_MS,
   GENERATION_POLL_MS,
   useProjectGeneration,
-} from './hooks/use-project-generation.js';
+} from './hooks/use-project-generation';
 export type {
   ForegroundPort,
   GenerationClient,
   GenerationStore,
   ProjectGeneration,
   UseProjectGenerationOptions,
-} from './hooks/use-project-generation.js';
+} from './hooks/use-project-generation';
 export {
   hasProjectsInFlight,
   useCancelProjectGeneration,
@@ -55,25 +55,25 @@ export {
   useProjects,
   useUpdateProject,
   type UseProjectsOptions,
-} from './hooks/use-projects.js';
-export { useSiteAdmin } from './hooks/use-site-admin.js';
+} from './hooks/use-projects';
+export { useSiteAdmin } from './hooks/use-site-admin';
 export {
   useTranscriptionCapability,
   type TranscriptionCapability,
-} from './hooks/use-transcription-capability.js';
+} from './hooks/use-transcription-capability';
 export {
   publishNamesProblem,
   suggestedPublicName,
   useProjectSnapshots,
   type ProjectSnapshots,
   type ProjectSnapshotsCallbacks,
-} from './hooks/use-project-snapshots.js';
+} from './hooks/use-project-snapshots';
 export {
   useCancelGenerationJob,
   useCreateGenerationJob,
   useGenerateScore,
   useGenerationJob,
   useRegenerateRegion,
-} from './hooks/use-generation.js';
-export { useScorePresets } from './hooks/use-presets.js';
-export { useScoreStyleSettings } from './hooks/use-style-settings.js';
+} from './hooks/use-generation';
+export { useScorePresets } from './hooks/use-presets';
+export { useScoreStyleSettings } from './hooks/use-style-settings';

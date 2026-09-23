@@ -11,12 +11,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { SnapshotSummary } from '@sudobility/music_types';
 import { LIVE_NODE_ID } from '@sudobility/music_types';
-import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server.js';
+import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server';
 import {
   publishNamesProblem,
   suggestedPublicName,
   useProjectSnapshots,
-} from './use-project-snapshots.js';
+} from './use-project-snapshots';
 
 function snap(id: string, parentId: string | null, extra: Partial<SnapshotSummary> = {}): SnapshotSummary {
   return { id, projectId: 'p1', parentId, name: id, createdAt: `2026-01-0${id.length}T00:00:00Z`, ...extra };

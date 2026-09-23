@@ -21,7 +21,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GenerationJob, GenerationJobKind } from '@sudobility/music_types';
-import type { MusicClient } from '../network/music-client.js';
+import type { MusicClient } from '../network/music-client';
 
 /** How often the project is checked while a job is running. */
 export const GENERATION_POLL_MS = 3000;

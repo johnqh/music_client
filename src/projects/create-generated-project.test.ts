@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { GenerateScoreRequest, Score } from '@sudobility/music_types';
-import { InsufficientCreditsError } from '../errors.js';
+import { InsufficientCreditsError } from '../errors';
 import {
   GENERATED_PROJECT_FALLBACK_NAME,
   createGeneratedProject,
   type GeneratedProjectClient,
-} from './create-generated-project.js';
+} from './create-generated-project';
 
 const request: GenerateScoreRequest = {
   prompt: 'A waltz',

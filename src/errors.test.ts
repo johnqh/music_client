@@ -5,7 +5,7 @@ import {
   QuotaExceededError,
   classifyGenerationError,
   isInsufficientCredits,
-} from './errors.js';
+} from './errors';
 
 describe('isInsufficientCredits', () => {
   it('recognises the typed error', () => {

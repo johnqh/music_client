@@ -9,9 +9,9 @@ import type {
   GenerateScoreRequest,
   RegenerateRegionRequest,
 } from '@sudobility/music_types';
-import { musicQueryKeys } from './query-keys.js';
-import { useMusicClient, type MusicHookContext } from './use-projects.js';
-import { hookAuthEnabled, requireHookToken } from './hook-context.js';
+import { musicQueryKeys } from './query-keys';
+import { useMusicClient, type MusicHookContext } from './use-projects';
+import { hookAuthEnabled, requireHookToken } from './hook-context';
 
 /** How often a running job is checked. Minutes of work, so seconds of latency cost nothing. */
 const JOB_POLL_MS = 3000;

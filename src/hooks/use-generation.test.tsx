@@ -11,7 +11,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { NetworkClient, NetworkRequestOptions, NetworkResponse } from '@sudobility/types';
 import type { GenerationJobStatus } from '@sudobility/music_types';
-import { useGenerationJob } from './use-generation.js';
+import { useGenerationJob } from './use-generation';
 
 const POLL_MS = 3000;
 

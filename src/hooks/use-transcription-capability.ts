@@ -6,9 +6,9 @@
  * worst order to learn it in.
  */
 import { useQuery } from '@tanstack/react-query';
-import { musicQueryKeys } from './query-keys.js';
-import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context.js';
-import { useMusicClient } from './use-projects.js';
+import { musicQueryKeys } from './query-keys';
+import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context';
+import { useMusicClient } from './use-projects';
 
 export type TranscriptionCapability = {
   /**

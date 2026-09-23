@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server.js';
-import { useTranscriptionCapability } from './use-transcription-capability.js';
+import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server';
+import { useTranscriptionCapability } from './use-transcription-capability';
 
 describe('useTranscriptionCapability', () => {
   it('answers what the deployment says', async () => {

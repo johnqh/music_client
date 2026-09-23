@@ -15,12 +15,12 @@ import type {
   ProjectSummary,
   ProjectUpdateRequest,
 } from '@sudobility/music_types';
-import { MusicClient } from '../network/music-client.js';
-import { musicQueryKeys } from './query-keys.js';
-import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context.js';
-import { GENERATION_POLL_MS } from './use-project-generation.js';
+import { MusicClient } from '../network/music-client';
+import { musicQueryKeys } from './query-keys';
+import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context';
+import { GENERATION_POLL_MS } from './use-project-generation';
 
-export type { MusicHookContext } from './hook-context.js';
+export type { MusicHookContext } from './hook-context';
 
 export function useMusicClient(networkClient: NetworkClient, baseUrl: string): MusicClient {
   return useMemo(() => new MusicClient(networkClient, baseUrl), [networkClient, baseUrl]);

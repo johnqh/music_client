@@ -35,9 +35,9 @@ import {
   type SnapshotSummary,
   type TreeNode,
 } from '@sudobility/music_types';
-import { musicQueryKeys } from './query-keys.js';
-import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context.js';
-import { useMusicClient } from './use-projects.js';
+import { musicQueryKeys } from './query-keys';
+import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context';
+import { useMusicClient } from './use-projects';
 
 /**
  * The public title offered for a new snapshot: the project's name, then the

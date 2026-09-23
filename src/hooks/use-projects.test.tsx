@@ -8,7 +8,7 @@ import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { NetworkClient, NetworkRequestOptions, NetworkResponse } from '@sudobility/types';
-import { useCreateProject, useProjects } from './use-projects.js';
+import { useCreateProject, useProjects } from './use-projects';
 
 function fakeNetwork(): { client: NetworkClient; log: string[] } {
   const log: string[] = [];

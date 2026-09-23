@@ -8,9 +8,9 @@
  * that question asked once, the same way, from either.
  */
 import { useQuery } from '@tanstack/react-query';
-import { musicQueryKeys } from './query-keys.js';
-import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context.js';
-import { useMusicClient } from './use-projects.js';
+import { musicQueryKeys } from './query-keys';
+import { hookAuthEnabled, requireHookToken, type MusicHookContext } from './hook-context';
+import { useMusicClient } from './use-projects';
 
 /**
  * How long an answer is trusted. Administrator status changes by hand on the

@@ -9,7 +9,7 @@ The network, and only the network: the typed `MusicClient` for the Moosiac music
 
 ## Tech Stack
 
-- TypeScript strict, ESM (source imports use `.js` specifiers; plain tsc build)
+- TypeScript strict, ESM. Source imports are extensionless (`entity_pages`' convention, not the `.js`-suffixed one most of the rest of this family uses — see that family's own CLAUDE.md). `tsc` (plain `tsconfig.json`, `noEmit: true`) is the type-check gate; `vite build` is what actually emits the single bundled `dist/index.js`
 - `NetworkClient` DI from `@sudobility/types` — zero direct fetch anywhere
 - Types/schemas from `@sudobility/music_types`; React Query ≥5 peer
 - Bun scripts, vitest + jsdom (+ @testing-library/react renderHook)

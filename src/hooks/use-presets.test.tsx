@@ -11,7 +11,7 @@ import React from 'react';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { NetworkClient, NetworkRequestOptions, NetworkResponse } from '@sudobility/types';
-import { useScorePresets } from './use-presets.js';
+import { useScorePresets } from './use-presets';
 
 function fakeNetwork(presets: string[]): {
   client: NetworkClient;

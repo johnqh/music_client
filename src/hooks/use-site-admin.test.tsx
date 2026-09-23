@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server.js';
-import { useSiteAdmin } from './use-site-admin.js';
+import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server';
+import { useSiteAdmin } from './use-site-admin';
 
 const me = (siteAdmin: boolean) => ({ data: { userId: 'u1', email: null, siteAdmin } });
 

@@ -9,15 +9,15 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server.js';
-import { hookAuthEnabled, resolveHookToken } from './hook-context.js';
+import { BASE_URL, fakeServer, newQueryClient, wrapperFor } from '../test/fake-server';
+import { hookAuthEnabled, resolveHookToken } from './hook-context';
 import {
   useCancelProjectGeneration,
   useDeleteProject,
   useDuplicateProject,
   useProjects,
-} from './use-projects.js';
-import { GENERATION_POLL_MS } from './use-project-generation.js';
+} from './use-projects';
+import { GENERATION_POLL_MS } from './use-project-generation';
 
 const summary = (id: string, status: 'ready' | 'generating' | 'transcribing' = 'ready') => ({
   id,

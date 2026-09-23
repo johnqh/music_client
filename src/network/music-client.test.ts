@@ -5,14 +5,14 @@
 import { describe, expect, it } from 'vitest';
 import type { NetworkClient, NetworkRequestOptions, NetworkResponse } from '@sudobility/types';
 import type { ApiResponse } from '@sudobility/music_types';
-import { MusicClient } from './music-client.js';
+import { MusicClient } from './music-client';
 import {
   AiOutputInvalidError,
   ApiError,
   ProjectNotFoundError,
   InsufficientCreditsError,
   QuotaExceededError,
-} from '../errors.js';
+} from '../errors';
 
 type Recorded = { url: string; options: NetworkRequestOptions | undefined };
 

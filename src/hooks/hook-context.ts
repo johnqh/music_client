@@ -9,7 +9,7 @@
  * `getToken`, the moment a hook sends is the moment it asks.
  */
 import type { NetworkClient } from '@sudobility/types';
-import { ApiError } from '../errors.js';
+import { ApiError } from '../errors';
 
 export type MusicHookContext = {
   networkClient: NetworkClient;

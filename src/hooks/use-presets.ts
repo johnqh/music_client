@@ -6,8 +6,8 @@
  * for every client that asks.
  */
 import { useQuery } from '@tanstack/react-query';
-import { musicQueryKeys } from './query-keys.js';
-import { useMusicClient, type MusicHookContext } from './use-projects.js';
+import { musicQueryKeys } from './query-keys';
+import { useMusicClient, type MusicHookContext } from './use-projects';
 
 /**
  * Static product data, so it is fetched once a session rather than per dialog.

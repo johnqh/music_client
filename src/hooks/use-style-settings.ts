@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { musicQueryKeys } from './query-keys.js';
-import { useMusicClient, type MusicHookContext } from './use-projects.js';
+import { musicQueryKeys } from './query-keys';
+import { useMusicClient, type MusicHookContext } from './use-projects';
 
 const STYLE_SETTINGS_STALE_MS = Infinity;
 
