@@ -259,7 +259,17 @@ export function useProjectGeneration(
         const known = state.serverUpdatedAt ?? lastUpdatedAtRef.current;
         lastUpdatedAtRef.current = updatedAt;
 
-        if (status === 'generating') {
+        // `transcribing` means exactly what `generating` does here — see
+        // `ProjectStatus`'s own comment: both mean "a job is producing this
+        // project's music, and writes must be refused until it lands," kept
+        // distinct only so the *caller* could say which one it is. This hook
+        // does not currently make that distinction, but it must still treat
+        // both as busy — an editor opened straight onto a fresh transcription
+        // (the normal flow: `POST /projects/transcribe` returns immediately,
+        // before the job has produced anything) previously saw `generating`
+        // go `false` on the very first poll, hid the overlay, and showed the
+        // still-empty score as though the transcription had finished blank.
+        if (status === 'generating' || status === 'transcribing') {
           setGenerating(true);
           generatingRef.current = true;
           return;
