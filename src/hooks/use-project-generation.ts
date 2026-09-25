@@ -18,10 +18,42 @@
  * (a browser tab's `visibilitychange`, or React Native's `AppState`). That is
  * what lets one implementation of these rules serve both apps — and the rules
  * are the valuable part, since almost every one of them is a bug somebody hit.
+ *
+ * ## Live generation
+ *
+ * With `live` configured the hook also opens the job's WebSocket
+ * (`/api/v1/jobs/:id/live`) and folds what arrives — the server's snapshot,
+ * then each partial — into the store through `applyLiveScore`, so the reader
+ * watches the notes appear rather than a spinner. The poll stays, slowed to a
+ * safety net: it is what catches a socket that could not be opened at all,
+ * and a job that ended while nobody was connected. On `complete` the final
+ * score is adopted straight from the message — the server read it back from
+ * the row after its last write, so it is byte for byte what `GET /projects/:id`
+ * would return — and the poll's freshness rule is told so, which is what keeps
+ * `onApplied` from re-downloading a project the client already holds.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GenerationJob, GenerationJobKind } from '@sudobility/music_types';
+import {
+  applyLiveGenerationMessage,
+  INITIAL_LIVE_GENERATION_STATE,
+  type GenerationJob,
+  type GenerationJobKind,
+  type GenerationRecord,
+  type LiveGenerationMessage,
+  type LiveGenerationProgress,
+  type LiveGenerationState,
+  type ProjectStatus,
+  type Score,
+  type ScoreRange,
+} from '@sudobility/music_types';
 import type { MusicClient } from '../network/music-client';
+import {
+  openLiveGeneration,
+  defaultWebSocketFactory,
+  type LiveGenerationSocket,
+  type ReconnectPolicy,
+  type WebSocketFactory,
+} from '../network/live-generation-socket';
 
 /** How often the project is checked while a job is running. */
 export const GENERATION_POLL_MS = 3000;
@@ -37,6 +69,24 @@ export const GENERATION_POLL_MS = 3000;
  * waiting out the interval.
  */
 export const GENERATION_IDLE_POLL_MS = 30_000;
+
+/**
+ * How often the project is polled while the live socket is healthy. The socket
+ * carries the news; the poll only has to notice the socket was wrong.
+ */
+export const LIVE_POLL_MS = 15_000;
+
+/**
+ * How long incoming partials are gathered before one goes into the store.
+ *
+ * Every new score object costs the renderer a full relayout and a flush of
+ * its glyph cache, and a job can emit several partials in one burst (a
+ * copied chorus lands in a few milliseconds). Four merges a second is what
+ * the renderer tolerates and more than a reader can follow; a slow merge
+ * stretches the window further, up to a second.
+ */
+export const LIVE_COALESCE_MS = 250;
+const LIVE_COALESCE_MAX_MS = 1000;
 
 /**
  * Whether anybody is looking at this app, and a way to be told when that
@@ -57,6 +107,13 @@ export type ForegroundPort = {
 export const ALWAYS_FOREGROUND: ForegroundPort = {
   isForeground: () => true,
   subscribe: () => () => {},
+};
+
+export type LiveScoreMeta = {
+  projectId: string;
+  /** The snapshot resets history; a partial keeps it. */
+  reason: 'snapshot' | 'partial';
+  serverUpdatedAt?: string;
 };
 
 /**
@@ -80,6 +137,13 @@ export type GenerationStore = {
      * job can still say so after the overlay that would have shown it is gone.
      */
     pushToast?(toast: { message: string; severity: 'error' }): unknown;
+    /**
+     * Puts a live score into the store without dirtying it, touching the
+     * transport, or marking it as this client's edit. Returns false when it
+     * cannot right now — the caller retries a moment later. Absent, and the
+     * hook never opens a socket.
+     */
+    applyLiveScore?(score: Score, meta: LiveScoreMeta): boolean;
   };
 };
 
@@ -93,12 +157,44 @@ export type GenerationClient = Pick<
   | 'getProjectStatus'
 >;
 
+/** Where the live stream stands, for a status strip. */
+export type LiveStatus = 'off' | 'connecting' | 'live' | 'reconnecting' | 'fallback';
+
+export type LiveGenerationFinal = {
+  score: Score;
+  /** The server's stamp for `score`, exactly as `GET /projects/:id` would report it. */
+  updatedAt: string;
+  /** The job that produced it; null for a transcription, which has none. */
+  job: GenerationJob | null;
+  lastGeneration?: GenerationRecord;
+  /** Every range the stream wrote, for highlighting what is new. */
+  touched: readonly ScoreRange[];
+};
+
+export type LiveGenerationOptions = {
+  /** The API's base URL; the socket URL is derived from it. */
+  baseUrl: string;
+  createSocket?: WebSocketFactory;
+  coalesceMs?: number;
+  livePollMs?: number;
+  reconnect?: Partial<ReconnectPolicy>;
+};
+
 export type ProjectGeneration = {
-  /** True from the moment a job is submitted until it reaches a terminal status. */
+  /**
+   * The project's status — the one source of truth for "can this be edited,
+   * played, and is there a stream to watch". `ready`, or busy with a
+   * generation or a transcription.
+   */
+  status: ProjectStatus;
+  /** `status !== 'ready'`: from the moment a job is submitted until the project is ready again. */
   generating: boolean;
   jobId: string | null;
   /** A failed job's message, cleared when the next one starts. */
   error: string | null;
+  /** The stream's last progress note, while one is open. */
+  progress: LiveGenerationProgress | null;
+  live: LiveStatus;
   start: (kind: GenerationJobKind, request: unknown) => Promise<void>;
   cancel: () => Promise<void>;
 };
@@ -122,6 +218,12 @@ export type UseProjectGenerationOptions = {
   /** Called when the server's copy has moved on. Awaited before unlocking. */
   onApplied?: () => void | Promise<void>;
   /**
+   * Adopts the final score a live stream delivered. Awaited before unlocking.
+   * Without it the live stream still shows the notes arriving, and the end is
+   * handled by `onApplied` through the poll, one full download later.
+   */
+  onComplete?: (final: LiveGenerationFinal) => void | Promise<void>;
+  /**
    * Handles a start failure that has its own remedy — running out of credits,
    * which opens a store rather than printing a message. Returning true means
    * "handled"; the inline error then stays empty, because the modal is the
@@ -132,6 +234,8 @@ export type UseProjectGenerationOptions = {
   signInRequiredMessage?: string;
   pollMs?: number;
   idlePollMs?: number;
+  /** The live stream. `false` or absent: poll only. */
+  live?: LiveGenerationOptions | false;
 };
 
 export function useProjectGeneration(
@@ -145,24 +249,51 @@ export function useProjectGeneration(
     foreground = ALWAYS_FOREGROUND,
     flush,
     onApplied,
+    onComplete,
     onStartError,
     signInRequiredMessage = 'You must be signed in.',
     pollMs = GENERATION_POLL_MS,
     idlePollMs = GENERATION_IDLE_POLL_MS,
+    live = false,
   } = options;
 
   const [jobId, setJobId] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
+  /*
+    The project's status, as the server last said it. Written by the poll,
+    by `start` (a created job means `generating` — the server flipped it in
+    the same transaction), by `cancel`, and by the stream's end. Everything
+    else here derives from it: the lock, the socket, the poll's cadence.
+  */
+  const [status, setStatus] = useState<ProjectStatus>('ready');
+  const generating = status !== 'ready';
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<LiveGenerationProgress | null>(null);
+  const [liveStatus, setLiveStatus] = useState<LiveStatus>('off');
 
   // Read inside the interval callback, never as a dep: re-creating the timer on
   // every render would reset the poll clock continuously.
   const onAppliedRef = useRef(onApplied);
   onAppliedRef.current = onApplied;
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   /** Which cadence the next tick should use. A ref because the timer reads it. */
   const generatingRef = useRef(generating);
   generatingRef.current = generating;
+  /** Whether the socket is delivering, so the poll can slow down. */
+  const liveHealthyRef = useRef(false);
+  /** Set while `complete` is being adopted, so a poll landing then does not reload over it. */
+  const completingRef = useRef(false);
+  /**
+   * The server stamp of the last score adopted from a live `complete`. A poll
+   * that reports it afterwards is describing a copy this client already holds,
+   * whatever the store's own record says — a store that tracks no stamp, or
+   * an `onComplete` that has not written one yet, must not turn that poll
+   * into a full re-download of the score the stream just delivered.
+   */
+  const adoptedAtRef = useRef<string | null>(null);
+  /** The poll's own check, callable from the live effect. */
+  const checkRef = useRef<(() => Promise<void>) | null>(null);
 
   /**
    * The server's `updatedAt` as of the last poll, for a store that tracks none.
@@ -192,12 +323,12 @@ export function useProjectGeneration(
 
         const job = await client.createJob({ projectId, kind, request }, token);
         setJobId(job.id);
-        setGenerating(true);
+        setStatus('generating');
         // Written straight through as well, so the next tick is scheduled at
         // the running-job cadence rather than one idle interval late.
         generatingRef.current = true;
       } catch (err) {
-        setGenerating(false);
+        setStatus('ready');
         generatingRef.current = false;
         if (onStartError?.(err)) return;
         setError(err instanceof Error ? err.message : String(err));
@@ -206,13 +337,16 @@ export function useProjectGeneration(
     [projectId, flush, client, getToken, onStartError, signInRequiredMessage]
   );
 
+  const socketRef = useRef<LiveGenerationSocket | null>(null);
+
   const cancel = useCallback(async (): Promise<void> => {
     const id = jobId;
     // Optimistic: the server releases the project synchronously, and the editor
     // should unlock now rather than after a round trip.
-    setGenerating(false);
+    setStatus('ready');
     generatingRef.current = false;
     setJobId(null);
+    socketRef.current?.close();
     try {
       const token = await getToken();
       if (!token) return;
@@ -240,10 +374,8 @@ export function useProjectGeneration(
         // Status only: the score cannot change while generating (writes are
         // rejected), so refetching it every few seconds is pure waste — and
         // under load it was enough to time jobs out.
-        const { status, updatedAt } = await client.getProjectStatus(
-          projectId,
-          token
-        );
+        const status = await client.getProjectStatus(projectId, token);
+        const { updatedAt } = status;
         if (stopped) return;
 
         /*
@@ -269,11 +401,18 @@ export function useProjectGeneration(
         // before the job has produced anything) previously saw `generating`
         // go `false` on the very first poll, hid the overlay, and showed the
         // still-empty score as though the transcription had finished blank.
-        if (status === 'generating' || status === 'transcribing') {
-          setGenerating(true);
+        if (status.status === 'generating' || status.status === 'transcribing') {
+          setStatus(status.status);
           generatingRef.current = true;
           return;
         }
+
+        // A live `complete` is being adopted this very moment: the stamp it
+        // carries is newer than anything known, and reloading over it would
+        // download what the client already holds.
+        if (completingRef.current) return;
+        const adopted = adoptedAtRef.current;
+        const alreadyHeld = adopted !== null && updatedAt <= adopted;
 
         /*
           Strictly newer, not merely different: a poll that started before a
@@ -294,6 +433,7 @@ export function useProjectGeneration(
           that window has their work replaced a moment later.
         */
         if (
+          !alreadyHeld &&
           state.saveState !== 'saving' &&
           known !== null &&
           known !== undefined &&
@@ -302,7 +442,7 @@ export function useProjectGeneration(
           await onAppliedRef.current?.();
         }
         if (stopped) return;
-        setGenerating(false);
+        setStatus('ready');
         generatingRef.current = false;
 
         /*
@@ -351,19 +491,22 @@ export function useProjectGeneration(
         }
       }
     };
+    checkRef.current = check;
 
     /*
       A self-rescheduling timeout rather than an interval, so the cadence can
       change with what is actually happening: three seconds while a job runs,
-      half a minute while nothing does.
+      half a minute while nothing does — and a quarter of a minute while the
+      socket is carrying the news itself.
     */
     let timer: ReturnType<typeof setTimeout> | null = null;
+    const livePollMs = live ? (live.livePollMs ?? LIVE_POLL_MS) : pollMs;
     const tick = async (): Promise<void> => {
       await check();
       if (stopped) return;
       timer = setTimeout(
         () => void tick(),
-        generatingRef.current ? pollMs : idlePollMs
+        liveHealthyRef.current ? livePollMs : generatingRef.current ? pollMs : idlePollMs
       );
     };
 
@@ -372,6 +515,7 @@ export function useProjectGeneration(
     void tick();
     return () => {
       stopped = true;
+      if (checkRef.current === check) checkRef.current = null;
       if (timer !== null) clearTimeout(timer);
       unsubscribe();
     };
@@ -380,11 +524,207 @@ export function useProjectGeneration(
     jobId,
     pollMs,
     idlePollMs,
+    live,
     client,
     getToken,
     store,
     foreground,
   ]);
 
-  return { generating, jobId, error, start, cancel };
+  /*
+    The live stream, for as long as the project is busy.
+
+    Opened the moment the status reads anything but `ready` — a generation
+    this hook started, one started elsewhere that the poll noticed, or a
+    transcription — and closed by the cleanup when the project is ready
+    again, when it changes, or on unmount. The stream is the project's, so
+    no job id is needed to find it. Everything it learns is folded through
+    music_types' reducer — the same fold the server's own tests use — and
+    the store sees the result at most a few times a second.
+  */
+  const liveBaseUrl = live ? live.baseUrl : null;
+  const liveCreateSocket = live ? live.createSocket : undefined;
+  const liveCoalesceMs = live ? (live.coalesceMs ?? LIVE_COALESCE_MS) : LIVE_COALESCE_MS;
+  const liveReconnect = live ? live.reconnect : undefined;
+  useEffect(() => {
+    if (!projectId || !liveBaseUrl || !generating) {
+      liveHealthyRef.current = false;
+      setLiveStatus('off');
+      return;
+    }
+    if (typeof store.getState().applyLiveScore !== 'function') {
+      setLiveStatus('off');
+      return;
+    }
+    const createSocket = liveCreateSocket ?? defaultWebSocketFactory();
+    if (!createSocket) {
+      setLiveStatus('fallback');
+      return;
+    }
+
+    let stopped = false;
+    let state: LiveGenerationState = INITIAL_LIVE_GENERATION_STATE;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+    let nextDelay = liveCoalesceMs;
+
+    const flush = () => {
+      flushTimer = null;
+      if (stopped || !state.score) return;
+      const started = Date.now();
+      // Read at flush time rather than captured: a store that swaps its
+      // methods (a reset between projects) is asked, not a stale closure.
+      const applied =
+        store.getState().applyLiveScore?.(state.score, {
+          projectId,
+          reason: state.lastSeq >= 0 && state.touched.length === 0 ? 'snapshot' : 'partial',
+          ...(state.updatedAt ? { serverUpdatedAt: state.updatedAt } : {}),
+        }) ?? false;
+      if (!applied) {
+        // The store could not take it right now; ask again shortly.
+        flushTimer = setTimeout(flush, liveCoalesceMs);
+        return;
+      }
+      const took = Date.now() - started;
+      // A slow merge — a big score on a slow device — widens the window, so
+      // the renderer is never asked for more than it can give.
+      nextDelay = Math.min(LIVE_COALESCE_MAX_MS, Math.max(liveCoalesceMs, took * 4));
+    };
+    const scheduleFlush = () => {
+      if (flushTimer === null) flushTimer = setTimeout(flush, nextDelay);
+    };
+
+    const finish = async (final: LiveGenerationState) => {
+      if (stopped) return;
+      completingRef.current = true;
+      // Told to the poll BEFORE anything is awaited: the stamp is the final
+      // one, so a poll landing mid-adoption has nothing newer to reload.
+      if (final.updatedAt) {
+        lastUpdatedAtRef.current = final.updatedAt;
+        adoptedAtRef.current = final.updatedAt;
+      }
+      if (flushTimer !== null) clearTimeout(flushTimer);
+      flushTimer = null;
+      try {
+        if (final.score && final.updatedAt && onCompleteRef.current) {
+          await onCompleteRef.current({
+            score: final.score,
+            updatedAt: final.updatedAt,
+            job: final.job,
+            ...(final.lastGeneration ? { lastGeneration: final.lastGeneration } : {}),
+            touched: final.touched,
+          });
+        } else {
+          await onAppliedRef.current?.();
+        }
+      } finally {
+        completingRef.current = false;
+      }
+      if (stopped) return;
+      setProgress(null);
+      setStatus('ready');
+      generatingRef.current = false;
+      setJobId(null);
+      // Ready: the socket closes (the effect's cleanup) and the state is
+      // fetched once more — status, stamp, any error — so what this hook
+      // reports is the server's word, not the stream's last one.
+      void checkRef.current?.();
+    };
+
+    const onMessage = (message: LiveGenerationMessage) => {
+      if (stopped) return;
+      const next = applyLiveGenerationMessage(state, message);
+      if (next === state) return;
+      state = next;
+      switch (message.type) {
+        case 'snapshot':
+          // Shown at once: this is the first thing the reader sees.
+          if (flushTimer !== null) clearTimeout(flushTimer);
+          flush();
+          return;
+        case 'fragment':
+          scheduleFlush();
+          return;
+        case 'progress':
+          setProgress(next.progress);
+          return;
+        case 'complete':
+          void finish(next);
+          return;
+        case 'failed':
+        case 'cancelled': {
+          // Not adopted here: the poll's own path unlocks, reloads if the
+          // server's copy moved, and reports the failure through the toast.
+          if (flushTimer !== null) clearTimeout(flushTimer);
+          flushTimer = null;
+          if (message.type === 'failed') setError(next.failure ?? 'Generation failed.');
+          liveHealthyRef.current = false;
+          void checkRef.current?.();
+          return;
+        }
+        default:
+          return;
+      }
+    };
+
+    setLiveStatus('connecting');
+    const socket = openLiveGeneration({
+      baseUrl: liveBaseUrl,
+      projectId,
+      getToken,
+      onMessage,
+      canConnect: () => foreground.isForeground(),
+      createSocket,
+      ...(liveReconnect ? { reconnect: liveReconnect } : {}),
+      onStatus: (status, detail) => {
+        if (stopped) return;
+        switch (status) {
+          case 'open':
+            liveHealthyRef.current = true;
+            setLiveStatus('live');
+            return;
+          case 'connecting':
+            return;
+          case 'reconnecting':
+          case 'parked':
+            liveHealthyRef.current = false;
+            setLiveStatus('reconnecting');
+            return;
+          case 'closed':
+            liveHealthyRef.current = false;
+            if (detail?.reason === 'terminal' || detail?.reason === 'closed') {
+              setLiveStatus('off');
+            } else {
+              // Gave up, no socket here, or no token: the poll takes over at
+              // its running cadence, starting now.
+              setLiveStatus('fallback');
+              void checkRef.current?.();
+            }
+            return;
+        }
+      },
+    });
+    socketRef.current = socket;
+    const unsubscribe = foreground.subscribe(() => socket.retryNow());
+
+    return () => {
+      stopped = true;
+      unsubscribe();
+      if (flushTimer !== null) clearTimeout(flushTimer);
+      if (socketRef.current === socket) socketRef.current = null;
+      socket.close();
+      liveHealthyRef.current = false;
+    };
+  }, [
+    projectId,
+    generating,
+    liveBaseUrl,
+    liveCreateSocket,
+    liveCoalesceMs,
+    liveReconnect,
+    store,
+    getToken,
+    foreground,
+  ]);
+
+  return { status, generating, jobId, error, progress, live: liveStatus, start, cancel };
 }

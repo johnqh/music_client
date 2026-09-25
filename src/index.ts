@@ -35,15 +35,36 @@ export {
   ALWAYS_FOREGROUND,
   GENERATION_IDLE_POLL_MS,
   GENERATION_POLL_MS,
+  LIVE_COALESCE_MS,
+  LIVE_POLL_MS,
   useProjectGeneration,
 } from './hooks/use-project-generation';
 export type {
   ForegroundPort,
   GenerationClient,
   GenerationStore,
+  LiveGenerationFinal,
+  LiveGenerationOptions,
+  LiveScoreMeta,
+  LiveStatus,
   ProjectGeneration,
   UseProjectGenerationOptions,
 } from './hooks/use-project-generation';
+export {
+  LIVE_RECONNECT_DEFAULTS,
+  defaultWebSocketFactory,
+  liveGenerationUrl,
+  openLiveGeneration,
+} from './network/live-generation-socket';
+export type {
+  LiveGenerationSocket,
+  LiveSocketCloseReason,
+  LiveSocketLike,
+  LiveSocketStatus,
+  OpenLiveGenerationOptions,
+  ReconnectPolicy,
+  WebSocketFactory,
+} from './network/live-generation-socket';
 export {
   hasProjectsInFlight,
   useCancelProjectGeneration,

@@ -123,7 +123,8 @@ type RequestOptions = {
 
 export class MusicClient {
   private readonly networkClient: NetworkClient;
-  private readonly baseUrl: string;
+  /** Public so the live-generation socket can be opened against the same server. */
+  readonly baseUrl: string;
 
   constructor(networkClient: NetworkClient, baseUrl: string) {
     this.networkClient = networkClient;
