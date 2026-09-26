@@ -191,7 +191,7 @@ describe('useProjectGeneration, live', () => {
     const onApplied = vi.fn();
     const onComplete = vi.fn(async (_f: LiveGenerationFinal) => undefined);
     const { client: c, getProjectStatus } = client({ status: 'generating', jobId: 'job-1' });
-    const live = { baseUrl: 'http://api.test', createSocket: fakes.factory, livePollMs: 30 };
+    const live = { baseUrl: 'http://api.test', createSocket: fakes.factory };
     const { result } = renderHook(() =>
       useProjectGeneration('p1', { store, client: c, getToken, onApplied, onComplete, pollMs: 30, live })
     );
@@ -271,6 +271,52 @@ describe('useProjectGeneration, live', () => {
     act(() => ws.serverClose(1006));
     await waitFor(() => expect(result.current.live).toBe('fallback'));
     await waitFor(() => expect(getProjectStatus.mock.calls.length).toBeGreaterThan(pollsBefore));
+  });
+
+  it('asks for the status not at all while the socket is open, and again the moment it drops', async () => {
+    const fakes = fakeWebSockets();
+    const { store } = liveStore();
+    const { client: c, getProjectStatus } = client({ status: 'generating', jobId: 'job-1' });
+    const live = {
+      baseUrl: 'http://api.test',
+      createSocket: fakes.factory,
+      reconnect: { initialMs: 1, maxMs: 1, maxAttempts: 8 },
+    };
+    const { result } = renderHook(() =>
+      useProjectGeneration('p1', { store, client: c, getToken, pollMs: 10, live })
+    );
+    const ws = await opened(fakes);
+    await waitFor(() => expect(result.current.live).toBe('live'));
+    // A check already in the air when the socket opened may still land.
+    await new Promise((r) => setTimeout(r, 30));
+    const whileLive = getProjectStatus.mock.calls.length;
+    // Ten running-cadence intervals: the stream carries the news, so nothing is asked.
+    await new Promise((r) => setTimeout(r, 100));
+    expect(getProjectStatus.mock.calls.length).toBe(whileLive);
+
+    // Dropped, not ended: the socket reconnects, and the poll watches meanwhile.
+    act(() => ws.serverClose(1006));
+    await waitFor(() => expect(result.current.live).toBe('reconnecting'));
+    await waitFor(() => expect(getProjectStatus.mock.calls.length).toBeGreaterThan(whileLive));
+  });
+
+  it('resumes polling when the server ends the stream with no terminal message', async () => {
+    // A 4xxx close is the server saying no, with nothing to fold: the poll is
+    // the only watcher left, and a paused one would lock the editor forever.
+    const fakes = fakeWebSockets();
+    const { store } = liveStore();
+    const { client: c, getProjectStatus } = client({ status: 'generating', jobId: 'job-1' });
+    const live = { baseUrl: 'http://api.test', createSocket: fakes.factory };
+    const { result } = renderHook(() =>
+      useProjectGeneration('p1', { store, client: c, getToken, pollMs: 10, live })
+    );
+    const ws = await opened(fakes);
+    await waitFor(() => expect(result.current.live).toBe('live'));
+    await new Promise((r) => setTimeout(r, 30));
+    const whileLive = getProjectStatus.mock.calls.length;
+    act(() => ws.serverClose(4001));
+    await waitFor(() => expect(result.current.live).toBe('off'));
+    await waitFor(() => expect(getProjectStatus.mock.calls.length).toBeGreaterThan(whileLive));
   });
 
   it('opens nothing when the store cannot take a live score, or live is off', async () => {

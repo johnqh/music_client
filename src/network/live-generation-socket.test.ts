@@ -201,6 +201,47 @@ describe('openLiveGeneration', () => {
     expect(h.fakes.sockets).toHaveLength(2);
   });
 
+  it('answers every heartbeat with a pong, and nothing else with anything', async () => {
+    const h = harness();
+    await settle();
+    const ws = h.fakes.sockets[0];
+    ws.open();
+    ws.serverSend(HEARTBEAT);
+    ws.serverSend(PROGRESS);
+    ws.serverSend(HEARTBEAT);
+    expect(ws.frames).toEqual([
+      { type: 'auth', token: 'tok' },
+      { type: 'pong' },
+      { type: 'pong' },
+    ]);
+  });
+
+  it('ping() asks the server, and drops a connection that does not answer in time', async () => {
+    const h = harness({
+      reconnect: { idleTimeoutMs: 10_000, pingTimeoutMs: 500, initialMs: 10, maxMs: 10 },
+    });
+    await settle();
+    const ws = h.fakes.sockets[0];
+    ws.open();
+    // Answered: the connection stands, on its full idle window again.
+    h.socket.ping();
+    expect(ws.frames[ws.frames.length - 1]).toEqual({ type: 'ping' });
+    await vi.advanceTimersByTimeAsync(300);
+    ws.serverSend(HEARTBEAT);
+    await vi.advanceTimersByTimeAsync(600);
+    expect(h.fakes.sockets).toHaveLength(1);
+    // Unanswered: gone within the ping window, not the idle one.
+    h.socket.ping();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(ws.clientClose).not.toBeNull();
+    await settle();
+    expect(h.fakes.sockets).toHaveLength(2);
+    // Not open: nothing is sent.
+    const next = h.fakes.sockets[1];
+    h.socket.ping();
+    expect(next.sent).toHaveLength(0);
+  });
+
   it('never reconnects after close()', async () => {
     const h = harness({ reconnect: { initialMs: 10 } });
     await settle();

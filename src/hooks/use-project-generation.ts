@@ -24,13 +24,18 @@
  * With `live` configured the hook also opens the job's WebSocket
  * (`/api/v1/jobs/:id/live`) and folds what arrives — the server's snapshot,
  * then each partial — into the store through `applyLiveScore`, so the reader
- * watches the notes appear rather than a spinner. The poll stays, slowed to a
- * safety net: it is what catches a socket that could not be opened at all,
- * and a job that ended while nobody was connected. On `complete` the final
- * score is adopted straight from the message — the server read it back from
- * the row after its last write, so it is byte for byte what `GET /projects/:id`
- * would return — and the poll's freshness rule is told so, which is what keeps
- * `onApplied` from re-downloading a project the client already holds.
+ * watches the notes appear rather than a spinner. **While the socket is open
+ * the status poll does not run at all**: the stream carries every change the
+ * poll could report, and a status request every few seconds beside it was
+ * pure repetition. The poll is what runs when the socket is *not* delivering —
+ * it never opened, it is reconnecting, it gave up, or the app is in the
+ * background — and it resumes the instant the socket reports any of those,
+ * so a job that ends while nobody was connected is still noticed. On
+ * `complete` the final score is adopted straight from the message — the
+ * server read it back from the row after its last write, so it is byte for
+ * byte what `GET /projects/:id` would return — and the poll's freshness rule
+ * is told so, which is what keeps `onApplied` from re-downloading a project
+ * the client already holds.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -69,12 +74,6 @@ export const GENERATION_POLL_MS = 3000;
  * waiting out the interval.
  */
 export const GENERATION_IDLE_POLL_MS = 30_000;
-
-/**
- * How often the project is polled while the live socket is healthy. The socket
- * carries the news; the poll only has to notice the socket was wrong.
- */
-export const LIVE_POLL_MS = 15_000;
 
 /**
  * How long incoming partials are gathered before one goes into the store.
@@ -176,7 +175,6 @@ export type LiveGenerationOptions = {
   baseUrl: string;
   createSocket?: WebSocketFactory;
   coalesceMs?: number;
-  livePollMs?: number;
   reconnect?: Partial<ReconnectPolicy>;
 };
 
@@ -280,7 +278,7 @@ export function useProjectGeneration(
   /** Which cadence the next tick should use. A ref because the timer reads it. */
   const generatingRef = useRef(generating);
   generatingRef.current = generating;
-  /** Whether the socket is delivering, so the poll can slow down. */
+  /** Whether the socket is delivering, in which case the poll does not run. */
   const liveHealthyRef = useRef(false);
   /** Set while `complete` is being adopted, so a poll landing then does not reload over it. */
   const completingRef = useRef(false);
@@ -292,8 +290,11 @@ export function useProjectGeneration(
    * into a full re-download of the score the stream just delivered.
    */
   const adoptedAtRef = useRef<string | null>(null);
-  /** The poll's own check, callable from the live effect. */
-  const checkRef = useRef<(() => Promise<void>) | null>(null);
+  /**
+   * The poll's controls, for the live effect. `pause` stops the timer while
+   * the socket carries the news; `resume` checks now and starts it again.
+   */
+  const pollRef = useRef<{ pause(): void; resume(): void } | null>(null);
 
   /**
    * The server's `updatedAt` as of the last poll, for a store that tracks none.
@@ -491,32 +492,50 @@ export function useProjectGeneration(
         }
       }
     };
-    checkRef.current = check;
-
     /*
       A self-rescheduling timeout rather than an interval, so the cadence can
       change with what is actually happening: three seconds while a job runs,
-      half a minute while nothing does — and a quarter of a minute while the
-      socket is carrying the news itself.
+      half a minute while nothing does — and nothing at all while the socket is
+      carrying the news itself. A tick that finds the socket open does not
+      reschedule; the live effect pauses the timer when the socket opens and
+      resumes it the moment the socket stops delivering.
     */
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const livePollMs = live ? (live.livePollMs ?? LIVE_POLL_MS) : pollMs;
-    const tick = async (): Promise<void> => {
-      await check();
-      if (stopped) return;
-      timer = setTimeout(
-        () => void tick(),
-        liveHealthyRef.current ? livePollMs : generatingRef.current ? pollMs : idlePollMs
-      );
+    let inFlight = false;
+    const pause = () => {
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
     };
+    const tick = async (): Promise<void> => {
+      // A resume landing on a check already in the air asks nothing more:
+      // that check is recent enough, and it reschedules when it lands.
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await check();
+      } finally {
+        inFlight = false;
+      }
+      if (stopped || liveHealthyRef.current) return;
+      pause();
+      timer = setTimeout(() => void tick(), generatingRef.current ? pollMs : idlePollMs);
+    };
+    const controls = {
+      pause,
+      resume: () => {
+        pause();
+        void tick();
+      },
+    };
+    pollRef.current = controls;
 
     const unsubscribe = foreground.subscribe(() => void check());
 
     void tick();
     return () => {
       stopped = true;
-      if (checkRef.current === check) checkRef.current = null;
-      if (timer !== null) clearTimeout(timer);
+      if (pollRef.current === controls) pollRef.current = null;
+      pause();
       unsubscribe();
     };
   }, [
@@ -524,7 +543,6 @@ export function useProjectGeneration(
     jobId,
     pollMs,
     idlePollMs,
-    live,
     client,
     getToken,
     store,
@@ -623,12 +641,22 @@ export function useProjectGeneration(
       setProgress(null);
       setStatus('ready');
       generatingRef.current = false;
+      liveHealthyRef.current = false;
       setJobId(null);
-      // Ready: the socket closes (the effect's cleanup) and the state is
-      // fetched once more — status, stamp, any error — so what this hook
-      // reports is the server's word, not the stream's last one.
-      void checkRef.current?.();
+      // Ready: the socket closes (the effect's cleanup), the state is fetched
+      // once more — status, stamp, any error — so what this hook reports is
+      // the server's word, not the stream's last one, and the idle poll is
+      // back on its clock.
+      pollRef.current?.resume();
     };
+
+    /**
+     * Whether a terminal message arrived. The close that follows one is not
+     * news — the message's own path has already resumed the poll — where a
+     * close with no message before it (a 4xxx code, the server saying no)
+     * is the only word this hook will get, and must resume it.
+     */
+    let terminalSeen = false;
 
     const onMessage = (message: LiveGenerationMessage) => {
       if (stopped) return;
@@ -648,17 +676,19 @@ export function useProjectGeneration(
           setProgress(next.progress);
           return;
         case 'complete':
+          terminalSeen = true;
           void finish(next);
           return;
         case 'failed':
         case 'cancelled': {
+          terminalSeen = true;
           // Not adopted here: the poll's own path unlocks, reloads if the
           // server's copy moved, and reports the failure through the toast.
           if (flushTimer !== null) clearTimeout(flushTimer);
           flushTimer = null;
           if (message.type === 'failed') setError(next.failure ?? 'Generation failed.');
           liveHealthyRef.current = false;
-          void checkRef.current?.();
+          pollRef.current?.resume();
           return;
         }
         default:
@@ -679,32 +709,46 @@ export function useProjectGeneration(
         if (stopped) return;
         switch (status) {
           case 'open':
+            // The stream carries the news from here: no status requests
+            // until it stops.
             liveHealthyRef.current = true;
+            pollRef.current?.pause();
             setLiveStatus('live');
             return;
           case 'connecting':
             return;
           case 'reconnecting':
           case 'parked':
+            // Not delivering: the poll takes over at its running cadence,
+            // starting now, until the socket is back.
             liveHealthyRef.current = false;
             setLiveStatus('reconnecting');
+            pollRef.current?.resume();
             return;
           case 'closed':
             liveHealthyRef.current = false;
             if (detail?.reason === 'terminal' || detail?.reason === 'closed') {
               setLiveStatus('off');
             } else {
-              // Gave up, no socket here, or no token: the poll takes over at
-              // its running cadence, starting now.
+              // Gave up, no socket here, or no token: the poll is all there is.
               setLiveStatus('fallback');
-              void checkRef.current?.();
             }
+            // Whatever ended it, the poll is the watcher again — unless a
+            // terminal message already put it back, in which case a second
+            // resume would only be a second status request.
+            if (!terminalSeen) pollRef.current?.resume();
             return;
         }
       },
     });
     socketRef.current = socket;
-    const unsubscribe = foreground.subscribe(() => socket.retryNow());
+    // Back in front: a parked socket reconnects, and an open one — which may
+    // be half-open after the background — is asked to prove it, so a dead
+    // connection is found in seconds rather than after the idle timeout.
+    const unsubscribe = foreground.subscribe(() => {
+      socket.retryNow();
+      socket.ping();
+    });
 
     return () => {
       stopped = true;

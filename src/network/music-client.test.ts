@@ -278,6 +278,26 @@ describe('MusicClient generation jobs', () => {
     expect(calls[0].options?.method).toBe('GET');
   });
 
+  it("lists a project's jobs, with each job's request, from the project route", async () => {
+    const listed = {
+      ...runningJob(),
+      status: 'done',
+      request: { instruction: 'brighter' },
+      usage: { promptTokens: 10, completionTokens: 2, model: 'm' },
+    };
+    const { client, calls } = fakeNetwork({ success: true, data: [listed] });
+    const music = new MusicClient(client, BASE);
+
+    const jobs = await music.listProjectJobs('p/1', 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/projects/p%2F1/jobs`);
+    expect(calls[0].options?.method).toBe('GET');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].request).toEqual({ instruction: 'brighter' });
+    expect(jobs[0].usage?.promptTokens).toBe(10);
+  });
+
   it('cancels via POST to the cancel sub-route', async () => {
     const { client, calls } = fakeNetwork({ success: true, data: { ok: true } });
     const music = new MusicClient(client, BASE);

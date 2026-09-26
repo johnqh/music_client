@@ -33,6 +33,7 @@ import type {
   GenerateScoreRequest,
   GenerateScoreResult,
   GenerationJob,
+  GenerationJobDetail,
   ProjectCreateRequest,
   ProjectDuplicateRequest,
   ProjectListQuery,
@@ -210,6 +211,18 @@ export class MusicClient {
 
   getJob(id: string, token: string): Promise<GenerationJob> {
     return this.request<GenerationJob>(`/jobs/${encodeURIComponent(id)}`, { token });
+  }
+
+  /**
+   * Every job a project has run, newest first, each with the request it was
+   * written to and what it cost. No score travels: a project's origin names
+   * a job id, and this is where that job's brief is read back from.
+   */
+  listProjectJobs(projectId: string, token: string): Promise<GenerationJobDetail[]> {
+    return this.request<GenerationJobDetail[]>(
+      `/projects/${encodeURIComponent(projectId)}/jobs`,
+      { token }
+    );
   }
 
   /** Releases the project. A job already in flight discards its result when it notices. */

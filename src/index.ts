@@ -36,7 +36,6 @@ export {
   GENERATION_IDLE_POLL_MS,
   GENERATION_POLL_MS,
   LIVE_COALESCE_MS,
-  LIVE_POLL_MS,
   useProjectGeneration,
 } from './hooks/use-project-generation';
 export type {
@@ -94,6 +93,7 @@ export {
   useCreateGenerationJob,
   useGenerateScore,
   useGenerationJob,
+  useProjectJobs,
   useRegenerateRegion,
 } from './hooks/use-generation';
 export { useScorePresets } from './hooks/use-presets';

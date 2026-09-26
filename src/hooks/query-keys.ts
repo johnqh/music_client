@@ -38,5 +38,7 @@ export const musicQueryKeys = {
   jobs: {
     all: ['music', 'jobs'] as const,
     detail: (id: string) => ['music', 'jobs', 'detail', id] as const,
+    /** A project's job history, with each job's request. */
+    forProject: (projectId: string) => ['music', 'jobs', 'project', projectId] as const,
   },
 } as const;

@@ -11,7 +11,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { NetworkClient, NetworkRequestOptions, NetworkResponse } from '@sudobility/types';
 import type { GenerationJobStatus } from '@sudobility/music_types';
-import { useGenerationJob } from './use-generation';
+import { useGenerationJob, useProjectJobs } from './use-generation';
 
 const POLL_MS = 3000;
 
@@ -29,14 +29,18 @@ function job(status: GenerationJobStatus) {
 
 function fakeNetwork(status: GenerationJobStatus): { client: NetworkClient; calls: () => number } {
   let count = 0;
-  const respond = <T,>(_url: string, _options?: NetworkRequestOptions): Promise<NetworkResponse<T>> => {
+  const respond = <T,>(url: string, _options?: NetworkRequestOptions): Promise<NetworkResponse<T>> => {
     count += 1;
+    // A project's history lists jobs with their requests; a job read is one job.
+    const data = /\/projects\/[^/]+\/jobs$/.test(url)
+      ? [{ ...job(status), request: { prompt: 'p' } }]
+      : job(status);
     return Promise.resolve({
       ok: true,
       status: 200,
       statusText: 'OK',
       headers: {},
-      data: { success: true, data: job(status) } as T,
+      data: { success: true, data } as T,
     } as NetworkResponse<T>);
   };
   return {
@@ -125,5 +129,49 @@ describe('useGenerationJob', () => {
       expect(resolved).toBe(false);
       qc.clear();
     }
+  });
+});
+
+describe('useProjectJobs', () => {
+  it("fetches the project's jobs, with their requests, under the project key", async () => {
+    const { client } = fakeNetwork('done');
+    const qc = newClient();
+    const ctx = { networkClient: client, baseUrl: 'http://api', token: 'tok' };
+
+    const { result } = renderHook(() => useProjectJobs(ctx, 'p1'), { wrapper: wrapper(qc) });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data?.[0].request).toEqual({ prompt: 'p' });
+    expect(qc.getQueryCache().find({ queryKey: ['music', 'jobs', 'project', 'p1'] })).toBeDefined();
+  });
+
+  it('stays disabled without a project, and without a token', () => {
+    const { client, calls } = fakeNetwork('done');
+    const qc = newClient();
+
+    const noProject = renderHook(
+      () => useProjectJobs({ networkClient: client, baseUrl: 'http://api', token: 'tok' }, null),
+      { wrapper: wrapper(qc) }
+    );
+    const noToken = renderHook(
+      () => useProjectJobs({ networkClient: client, baseUrl: 'http://api', token: null }, 'p1'),
+      { wrapper: wrapper(qc) }
+    );
+
+    expect(noProject.result.current.fetchStatus).toBe('idle');
+    expect(noToken.result.current.fetchStatus).toBe('idle');
+    expect(calls()).toBe(0);
+  });
+
+  it('does not poll: a history is about finished work', async () => {
+    const { client } = fakeNetwork('done');
+    const qc = newClient();
+    const ctx = { networkClient: client, baseUrl: 'http://api', token: 'tok' };
+
+    const { result } = renderHook(() => useProjectJobs(ctx, 'p1'), { wrapper: wrapper(qc) });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    const query = qc.getQueryCache().find({ queryKey: ['music', 'jobs', 'project', 'p1'] });
+    expect(query?.observers[0]?.options.refetchInterval).toBeUndefined();
   });
 });

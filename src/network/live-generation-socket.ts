@@ -22,11 +22,18 @@
  * - `error{unauthorized}` earns exactly one reconnect with a fresh token.
  * - While the host says nobody is looking (`canConnect` false) the socket
  *   parks instead of retrying; `retryNow()` resumes it.
+ * - Every server `heartbeat` is answered with a `pong`, so the server can
+ *   tell a client that is there from one whose tab was killed without a
+ *   close frame; it closes 1001 after `LIVE_GENERATION_IDLE_TIMEOUT_MS` of
+ *   silence, and that code is retried like any other drop.
  * - A watchdog reconnects a socket that has gone quiet longer than the
  *   server's heartbeat allows — a half-open connection after a phone came
- *   back from the background looks exactly like silence.
+ *   back from the background looks exactly like silence. `ping()` shortens
+ *   that wait to `pingTimeoutMs` for a connection the host has reason to
+ *   doubt: it sends a `ping`, and a server that is there answers at once.
  */
 import {
+  LIVE_GENERATION_IDLE_TIMEOUT_MS,
   isTerminalLiveGenerationMessage,
   parseLiveGenerationMessage,
   type LiveGenerationMessage,
@@ -77,13 +84,16 @@ export type ReconnectPolicy = {
   maxAttempts: number;
   /** Silence longer than this is treated as a dead connection. */
   idleTimeoutMs: number;
+  /** After `ping()`, how long the server has to answer before the connection is dropped. */
+  pingTimeoutMs: number;
 };
 
 export const LIVE_RECONNECT_DEFAULTS: ReconnectPolicy = {
   initialMs: 1000,
   maxMs: 15_000,
   maxAttempts: 8,
-  idleTimeoutMs: 45_000,
+  idleTimeoutMs: LIVE_GENERATION_IDLE_TIMEOUT_MS,
+  pingTimeoutMs: 5_000,
 };
 
 export type OpenLiveGenerationOptions = {
@@ -104,6 +114,12 @@ export type LiveGenerationSocket = {
   readonly status: LiveSocketStatus;
   /** Reconnects a parked socket now, and pulls a scheduled retry forward. */
   retryNow(): void;
+  /**
+   * Asks an open connection whether it is still one. Sends a `ping`; if
+   * nothing comes back within `pingTimeoutMs` the socket is dropped and
+   * reconnected. Does nothing unless the socket is open.
+   */
+  ping(): void;
   /** Ends the stream; no reconnect follows. */
   close(): void;
 };
@@ -141,14 +157,23 @@ export function openLiveGeneration(
     idleTimer = null;
   };
 
-  const armIdle = () => {
+  const armIdle = (ms = policy.idleTimeoutMs) => {
     if (idleTimer !== null) clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       // Quiet for longer than the server's heartbeat allows: assume the
       // connection is dead under us and start again.
       idleTimer = null;
       dropAndReconnect();
-    }, policy.idleTimeoutMs);
+    }, ms);
+  };
+
+  /** A frame to the server; a socket that throws is one the close will report. */
+  const say = (ws: LiveSocketLike, frame: { type: 'ping' } | { type: 'pong' }) => {
+    try {
+      ws.send(JSON.stringify(frame));
+    } catch {
+      // The close that follows decides what happens.
+    }
   };
 
   const end = (reason: LiveSocketCloseReason) => {
@@ -247,6 +272,8 @@ export function openLiveGeneration(
       }
       // A healthy connection: the next drop starts the backoff from scratch.
       attempt = 0;
+      // The server's heartbeat is its ping; this is the pong it is counting.
+      if (message.type === 'heartbeat') say(ws, { type: 'pong' });
       if (message.type === 'error' && message.code === 'unauthorized' && !reauthed) {
         // Once, with a fresh token; the server closes 4401 right after this,
         // which must not be read as a refusal to retry.
@@ -311,6 +338,12 @@ export function openLiveGeneration(
         retryTimer = null;
         void connect();
       }
+    },
+    ping() {
+      if (finished || status !== 'open' || !socket) return;
+      say(socket, { type: 'ping' });
+      // Any frame re-arms the full window; only silence trips this one.
+      armIdle(policy.pingTimeoutMs);
     },
     close() {
       end('closed');

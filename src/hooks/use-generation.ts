@@ -55,6 +55,24 @@ export function useCancelGenerationJob(ctx: MusicHookContext) {
  * timer — a finished job that kept polling would keep a request loop alive for
  * the rest of the session.
  */
+/**
+ * A project's job history — every job with its request and usage, newest
+ * first — for an inspector showing what a generated project was asked for.
+ *
+ * Not polled: it answers about finished work. A panel watching a running job
+ * uses `useProjectGeneration`, whose completion invalidates
+ * `musicQueryKeys.jobs.all`, so this refetches once the row it wants exists.
+ */
+export function useProjectJobs(ctx: MusicHookContext, projectId: string | null) {
+  const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
+  return useQuery({
+    queryKey: musicQueryKeys.jobs.forProject(projectId ?? ''),
+    enabled: projectId !== null && hookAuthEnabled(ctx),
+    queryFn: async () =>
+      client.listProjectJobs(projectId as string, await requireHookToken(ctx)),
+  });
+}
+
 export function useGenerationJob(ctx: MusicHookContext, id: string | null) {
   const client = useMusicClient(ctx.networkClient, ctx.baseUrl);
   return useQuery({
