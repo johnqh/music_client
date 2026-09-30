@@ -78,6 +78,13 @@ export {
 } from './hooks/use-projects';
 export { useSiteAdmin } from './hooks/use-site-admin';
 export {
+  useDeleteAvatar,
+  useProfile,
+  useUpdateProfile,
+  useUploadAvatar,
+  type AvatarUpload,
+} from './hooks/use-profile';
+export {
   useTranscriptionCapability,
   type TranscriptionCapability,
 } from './hooks/use-transcription-capability';

@@ -32,6 +32,8 @@ export const musicQueryKeys = {
    * for the next one signed in on the same device.
    */
   me: (userId?: string | null) => ['music', 'me', userId ?? ''] as const,
+  /** Per account, like `me`: the nickname and picture are one account's. */
+  profile: (userId?: string | null) => ['music', 'profile', userId ?? ''] as const,
   transcription: {
     capability: ['music', 'transcription', 'capability'] as const,
   },

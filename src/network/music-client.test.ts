@@ -519,3 +519,86 @@ describe('MusicClient presets', () => {
     expect(await new MusicClient(client, BASE).getScoreStyleSettings()).toEqual({});
   });
 });
+
+describe('MusicClient profile', () => {
+  const profile = { nickname: 'Ann', avatarId: null };
+
+  it('reads the profile with a token', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: profile });
+    const read = await new MusicClient(client, BASE).getProfile('tok');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/me/profile`);
+    expect(calls[0].options?.method).toBe('GET');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+    expect(read).toEqual(profile);
+  });
+
+  it('sets the nickname by PUT, and clears it with null', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: profile });
+    const music = new MusicClient(client, BASE);
+    await music.updateProfile({ nickname: 'Ann' }, 'tok');
+    await music.updateProfile({ nickname: null }, 'tok');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/me/profile`);
+    expect(calls[0].options?.method).toBe('PUT');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+    expect(JSON.parse(calls[0].options?.body as string)).toEqual({ nickname: 'Ann' });
+    // Null has to arrive as null: leaving the field out is not a request to clear it.
+    expect(JSON.parse(calls[1].options?.body as string)).toEqual({ nickname: null });
+  });
+
+  it('uploads a picture as multipart under `file`', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: { nickname: 'Ann', avatarId: 'a1' } });
+    const file = new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' });
+
+    const saved = await new MusicClient(client, BASE).uploadAvatar(file, 'me.jpg', 'tok');
+
+    expect(calls[0].url).toBe(`${BASE}/api/v1/me/avatar`);
+    expect(calls[0].options?.method).toBe('POST');
+    expect(calls[0].options?.body).toBeInstanceOf(FormData);
+    const form = calls[0].options?.body as FormData;
+    const fields: string[] = [];
+    form.forEach((_value, key) => fields.push(key));
+    expect(fields).toEqual(['file']);
+    expect((form.get('file') as File).name).toBe('me.jpg');
+    // Left to the platform, so multipart gets its boundary.
+    expect(calls[0].options?.headers?.['Content-Type']).toBeUndefined();
+    expect(calls[0].options?.headers?.['Authorization']).toBe('Bearer tok');
+    expect(saved.avatarId).toBe('a1');
+  });
+
+  it('removes the picture by DELETE', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: profile });
+    await new MusicClient(client, BASE).deleteAvatar('tok');
+    expect(calls[0].url).toBe(`${BASE}/api/v1/me/avatar`);
+    expect(calls[0].options?.method).toBe('DELETE');
+    expect(calls[0].options?.headers?.Authorization).toBe('Bearer tok');
+  });
+
+  it('surfaces a refused picture as an ApiError carrying the status', async () => {
+    const { client } = fakeNetwork(
+      { success: false, error: 'Too large.', code: 'AVATAR_TOO_LARGE' },
+      413
+    );
+    const failure = await new MusicClient(client, BASE)
+      .uploadAvatar(new Blob(['x']), 'me.png', 'tok')
+      .catch((e: unknown) => e);
+    expect(failure).toBeInstanceOf(ApiError);
+    expect((failure as ApiError).status).toBe(413);
+  });
+
+  it('builds a picture address from its own base, asking the network nothing', () => {
+    const { client, calls } = fakeNetwork({ success: true, data: null });
+    expect(new MusicClient(client, BASE).avatarUrl('a1')).toBe(`${BASE}/api/v1/public/avatars/a1`);
+    // A trailing slash on the base is dropped, as it is for every request.
+    expect(new MusicClient(client, `${BASE}/`).avatarUrl('a1')).toBe(
+      `${BASE}/api/v1/public/avatars/a1`
+    );
+    expect(calls).toHaveLength(0);
+  });
+
+  it('encodes the picture id', () => {
+    const { client } = fakeNetwork({ success: true, data: null });
+    expect(new MusicClient(client, BASE).avatarUrl('a/b c?d')).toBe(
+      `${BASE}/api/v1/public/avatars/a%2Fb%20c%3Fd`
+    );
+  });
+});

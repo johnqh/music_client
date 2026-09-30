@@ -41,6 +41,7 @@ import type {
   ProjectSaveResult,
   ProjectStatusResult,
   CurrentUser,
+  ProfileUpdateRequest,
   ProjectSummary,
   ProjectUpdateRequest,
   CommunityItem,
@@ -51,6 +52,7 @@ import type {
   RegenerateRegionResult,
   ScorePresetKey,
   GenerateScoreStyleSettings,
+  UserProfile,
 } from '@sudobility/music_types';
 import {
   scorePresetsResponseSchema,
@@ -132,8 +134,13 @@ export class MusicClient {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
+  /** Where an endpoint lives on this server. The one place a URL is assembled. */
+  private urlFor(endpoint: string): string {
+    return `${this.baseUrl}${BASE_PATH}${endpoint}`;
+  }
+
   private async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
-    const url = `${this.baseUrl}${BASE_PATH}${endpoint}`;
+    const url = this.urlFor(endpoint);
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (options.token) {
       headers['Authorization'] = `Bearer ${options.token}`;
@@ -331,6 +338,45 @@ export class MusicClient {
    */
   async getCurrentUser(token: string): Promise<CurrentUser> {
     return this.request<CurrentUser>('/me', { token });
+  }
+
+  // -- Profile ---------------------------------------------------------------
+
+  /** The nickname this account publishes under, and its picture, if it has either. */
+  getProfile(token: string): Promise<UserProfile> {
+    return this.request<UserProfile>('/me/profile', { token });
+  }
+
+  /** Sets the nickname, or clears it with `null`. */
+  updateProfile(req: ProfileUpdateRequest, token: string): Promise<UserProfile> {
+    return this.request<UserProfile>('/me/profile', { method: 'PUT', body: req, token });
+  }
+
+  /**
+   * Replaces the profile picture and returns the profile naming the new one.
+   *
+   * Multipart under `file`, in either of the shapes `transcribeAudio` takes
+   * and for the same reason: React Native hands over a path, not bytes.
+   */
+  uploadAvatar(file: UploadableFile, filename: string, token: string): Promise<UserProfile> {
+    const form = new FormData();
+    form.append('file', file as unknown as Blob, filename);
+    return this.request<UserProfile>('/me/avatar', { method: 'POST', rawBody: form, token });
+  }
+
+  deleteAvatar(token: string): Promise<UserProfile> {
+    return this.request<UserProfile>('/me/avatar', { method: 'DELETE', token });
+  }
+
+  /**
+   * The address of a profile picture, for an image element to load.
+   *
+   * Built here, from the same base every request is sent to, so no app
+   * assembles a server URL of its own. Public and not an envelope — the bytes
+   * are the image — which is why nothing in this client requests it.
+   */
+  avatarUrl(avatarId: string): string {
+    return this.urlFor(`/public/avatars/${encodeURIComponent(avatarId)}`);
   }
 
   /**
