@@ -6,7 +6,7 @@
       "name": "@sudobility/music_client",
       "devDependencies": {
         "@eslint/js": "^9.38.0",
-        "@sudobility/music_types": "^0.13.47",
+        "@sudobility/music_types": "^0.13.48",
         "@sudobility/types": "^1.9.68",
         "@tanstack/react-query": "^5.0.0",
         "@testing-library/react": "^16.3.0",
@@ -29,7 +29,7 @@
       },
       "peerDependencies": {
         "@sudobility/di": "^1.5.68",
-        "@sudobility/music_types": "^0.13.47",
+        "@sudobility/music_types": "^0.13.48",
         "@sudobility/types": "^1.9.68",
         "@tanstack/react-query": ">=5",
         "react": ">=18",
@@ -309,7 +309,7 @@
 
     "@sudobility/di": ["@sudobility/di@1.5.58", "", { "peerDependencies": { "@notifee/react-native": ">=7.0.0", "@react-native-async-storage/async-storage": ">=1.19.0", "@react-native-community/netinfo": ">=9.0.0", "@react-native-firebase/analytics": ">=18.0.0", "@react-native-firebase/app": ">=18.0.0", "@react-native-firebase/messaging": ">=18.0.0", "@react-native-firebase/remote-config": ">=18.0.0", "@sudobility/types": "^1.9.62", "firebase": ">=11.0.0", "react": ">=18.0.0", "react-native": ">=0.70.0" }, "optionalPeers": ["@notifee/react-native", "@react-native-async-storage/async-storage", "@react-native-community/netinfo", "@react-native-firebase/analytics", "@react-native-firebase/app", "@react-native-firebase/messaging", "@react-native-firebase/remote-config", "firebase", "react-native"] }, "sha512-0dheHIza5B+DrEZzj3eZUlE1gI3Rst0XFhboC8CDskEhXNhVd6THxlMhbj20hXC4zxB9Ore6n8YxFDOZbT1qaA=="],
 
-    "@sudobility/music_types": ["@sudobility/music_types@0.13.47", "", { "peerDependencies": { "@sudobility/types": "^1.9.68", "immer": "^10.0.0 || ^11.0.0", "zod": "^4.0.0" } }, "sha512-H+9HKdvbGsQJSA+Q8iRn6ZHhKKDqt/gHm4V0WL7p9Lo75jOCTR0nBnwQulCKTPBxUnhX9v5TwokiQGqXb7xwsw=="],
+    "@sudobility/music_types": ["@sudobility/music_types@0.13.48", "", { "peerDependencies": { "@sudobility/types": "^1.9.68", "immer": "^10.0.0 || ^11.0.0", "zod": "^4.0.0" } }, "sha512-yHRD9iiiqfUz0wAfaINm56sWmIPVt9VXXchgEt1B8o8Q5p3l+mCA0vTsX++7WINfwwYYXt9XMdq++UjVknK2sw=="],
 
     "@sudobility/types": ["@sudobility/types@1.9.68", "", {}, "sha512-4LL5+UfcqQcc0PKKR/z/PqS6j9DQPVkkjL+3oOW+Bwx0TAu1SVKAlPhlt/9ruNMW+abcHuZoFvbOVD5gdYBSGw=="],
 
