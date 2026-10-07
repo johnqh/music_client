@@ -272,7 +272,8 @@ export class MusicClient {
   async transcribeAudio(
     file: UploadableFile,
     filename: string,
-    token: string
+    token: string,
+    options?: { instrument?: 'voice' }
   ): Promise<ProjectSaveResult> {
     const form = new FormData();
     /*
@@ -293,6 +294,7 @@ export class MusicClient {
       client's, and a second copy of them is a second thing to keep in step.
     */
     form.append('file', file as unknown as Blob, filename);
+    if (options?.instrument) form.append('instrument', options.instrument);
     return this.request<ProjectSaveResult>('/projects/transcribe', {
       method: 'POST',
       rawBody: form,

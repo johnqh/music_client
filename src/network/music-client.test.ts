@@ -376,6 +376,18 @@ describe('audio transcription', () => {
     expect((form.get('file') as File).name).toBe('west end girls.mp3');
   });
 
+  it('sends the voice hint for a microphone take', async () => {
+    const { client, calls } = fakeNetwork({ success: true, data: project });
+    await new MusicClient(client, BASE).transcribeAudio(
+      new Blob(['voice'], { type: 'audio/wav' }),
+      'voice.wav',
+      'tok',
+      { instrument: 'voice' },
+    );
+    const form = calls[0].options?.body as FormData;
+    expect(form.get('instrument')).toBe('voice');
+  });
+
   it('leaves the content type to the platform, so multipart gets its boundary', async () => {
     // A hand-written multipart header has no boundary parameter, and a server
     // cannot parse the body without one.
